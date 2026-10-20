@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/client";
 import { useSession } from "@/components/providers";
 import { SystemIcon } from "@/components/panel/system-icon";
@@ -32,6 +33,13 @@ import {
   ExternalLink,
   Loader2,
   Signal,
+  KeyRound,
+  Copy,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatShortJalali } from "@/lib/jalali";
@@ -46,6 +54,8 @@ interface Sys {
   connectionLevel: string;
   status: string;
   sortOrder: number;
+  clientId: string | null;
+  clientSecret: string | null;
 }
 
 const ICON_OPTIONS = ["HeartPulse", "GraduationCap", "Building2", "Brain", "Cpu", "Globe"];
@@ -56,6 +66,9 @@ export default function AdminSystemsPage() {
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const [copied, setCopied] = useState<string | null>(null);
+  const [regenId, setRegenId] = useState<string | null>(null);
 
   const [fName, setFName] = useState("");
   const [fUrl, setFUrl] = useState("");
@@ -85,6 +98,28 @@ export default function AdminSystemsPage() {
       await load();
     } catch (err) {
       toast.error((err as Error).message);
+    }
+  }
+
+  async function copyValue(id: string, value: string | null, label: string) {
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    setCopied(id + label);
+    toast.success(`${label} کپی شد`);
+    setTimeout(() => setCopied(null), 1500);
+  }
+
+  async function regenerate(s: Sys) {
+    if (!confirm(`رمز اتصال «${s.name}» تمدید شود؟ رمز قبلی بلافاصله باطل می‌شود و باید با تیم فنی سامانه هماهنگ شود.`)) return;
+    setRegenId(s.id);
+    try {
+      await api(`/api/systems/${s.id}/credentials`, { method: "POST", body: {} });
+      toast.success(`رمز اتصال ${s.name} تمدید شد`);
+      await load();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setRegenId(null);
     }
   }
 
@@ -138,9 +173,16 @@ export default function AdminSystemsPage() {
             اطلاعات و انجام عملیات از داخل رز هاب با API و مجوزهای مناسب.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="size-4" /> سامانه جدید
-        </Button>
+        <div className="flex gap-2">
+          <Link href="/sso-docs">
+            <Button variant="outline">
+              <BookOpen className="size-4" /> مستندات اتصال SSO
+            </Button>
+          </Link>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="size-4" /> سامانه جدید
+          </Button>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -195,6 +237,71 @@ export default function AdminSystemsPage() {
                     <Globe className="size-4" /> مشاهده سایت
                   </Button>
                 </a>
+              </div>
+
+              {/* مشخصات اتصال SSO */}
+              <div className="rounded-xl border border-dashed p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium flex items-center gap-1.5 text-foreground">
+                    <KeyRound className="size-3.5 text-primary" /> مشخصات اتصال (Client ID / Secret)
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 text-[11px] text-muted-foreground"
+                    onClick={() => regenerate(s)}
+                    disabled={regenId === s.id}
+                  >
+                    {regenId === s.id ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+                    تمدید رمز
+                  </Button>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-muted-foreground w-20 shrink-0">Client ID</span>
+                    <code dir="ltr" className="flex-1 text-left text-[10px] bg-muted/70 rounded-lg px-2 py-1 font-mono truncate">
+                      {s.clientId ?? "—"}
+                    </code>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 shrink-0"
+                      aria-label="کپی Client ID"
+                      onClick={() => copyValue(s.id, s.clientId, "Client ID")}
+                    >
+                      {copied === s.id + "Client ID" ? <CheckCircle2 className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-muted-foreground w-20 shrink-0">Secret</span>
+                    <code dir="ltr" className="flex-1 text-left text-[10px] bg-muted/70 rounded-lg px-2 py-1 font-mono truncate">
+                      {s.clientSecret ? (revealed[s.id] ? s.clientSecret : "••••••••••••••••••••••••") : "—"}
+                    </code>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 shrink-0"
+                      aria-label="نمایش/پنهان رمز"
+                      onClick={() => setRevealed((r) => ({ ...r, [s.id]: !r[s.id] }))}
+                    >
+                      {revealed[s.id] ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 shrink-0"
+                      aria-label="کپی Secret"
+                      onClick={() => copyValue(s.id, s.clientSecret, "Secret")}
+                    >
+                      {copied === s.id + "Secret" ? <CheckCircle2 className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-5">
+                  این دو مقدار را با تیم فنی سامانه هماهنگ کنید؛ راهنمای کامل پیاده‌سازی در صفحه
+                  <Link href="/sso-docs" className="text-primary hover:underline mx-1">مستندات اتصال</Link>
+                  است.
+                </p>
               </div>
             </CardContent>
           </Card>

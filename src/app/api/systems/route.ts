@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuth, ApiError } from "@/lib/auth";
+import { requireAuth, ApiError, ensureSystemCredentials } from "@/lib/auth";
 import { apiError, json } from "@/lib/api";
 
 /** فهرست سامانه‌ها بر اساس دسترسی کاربر */
@@ -12,12 +12,23 @@ export async function GET(req: NextRequest) {
       include: { metrics: true },
     });
 
+    // برای مدیر کل: اطمینان از وجود مشخصات اتصال و ارسال آن‌ها (مدیریت اتصال SSO)
+    let creds: Record<string, { clientId: string | null; clientSecret: string | null }> = {};
+    if (user.role === "SUPER_ADMIN") {
+      for (const s of all) {
+        const c = await ensureSystemCredentials(s.id);
+        creds[s.id] = c;
+      }
+    }
+
     const access = await db.systemAccess.findMany({ where: { userId: user.id } });
     const allowed = new Set(access.map((a) => a.systemId));
 
     return json({
       systems: all.map((s) => ({
         ...s,
+        clientId: creds[s.id]?.clientId ?? null,
+        clientSecret: creds[s.id]?.clientSecret ?? null,
         hasAccess: allowed.has(s.id) || user.role === "SUPER_ADMIN",
       })),
     });

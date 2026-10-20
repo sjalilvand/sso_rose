@@ -1,17 +1,24 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuth, ApiError, audit, signSSOToken, ipFromRequest } from "@/lib/auth";
-import { apiError, json, readBody } from "@/lib/api";
+import {
+  requireAuth,
+  ApiError,
+  audit,
+  signSSOToken,
+  ipFromRequest,
+  ensureSystemCredentials,
+} from "@/lib/auth";
+import { apiError, json } from "@/lib/api";
 
 /**
  * ورود یکپارچه (اتصال پایه):
  * ۱. بررسی مجوز کاربر برای سامانه مقصد
- * ۲. صدور توکن موقت SSO (اعتبار ۵ دقیقه)
- * ۳. ثبت رویداد ورود یکپارچه
- * ۴. بازگرداندن نشانی راه‌اندازی برای انتقال کاربر به سامانه مقصد
+ * ۲. اطمینان از وجود مشخصات اتصال سامانه (clientId/clientSecret)
+ * ۳. صدور توکن موقت SSO — JWT امضاشده با رمز اختصاصی سامانه (اعتبار ۵ دقیقه)
+ * ۴. ثبت رویداد ورود یکپارچه
+ * ۵. بازگرداندن نشانی راه‌اندازی برای انتقال کاربر به سامانه مقصد
  *
- * نکته مستندات: پشتیبانی واقعی سامانه‌های مقصد از OIDC/OAuth2 باید
- * جداگانه با تیم فنی هر سامانه بررسی و پیاده‌سازی شود.
+ * سامانه مقصد مستندات «docs/sso-integration-fa.md» را برای اعتبارسنجی توکن دنبال می‌کند.
  */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -28,12 +35,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     if (!access && user.role !== "SUPER_ADMIN")
       throw new ApiError("شما مجوز دسترسی به این سامانه را ندارید. از مدیر سامانه درخواست کنید.", 403);
 
+    const creds = await ensureSystemCredentials(system.id);
+
     const { token, expiresAt } = await signSSOToken({
       userId: user.id,
       email: user.email,
       name: user.name,
+      role: user.role,
       systemId: system.id,
       systemName: system.name,
+      clientId: creds.clientId,
+      clientSecret: creds.clientSecret,
     });
 
     await audit({

@@ -24,6 +24,7 @@ import {
   Loader2,
   Database,
   ArrowUpRight,
+  BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { faNum } from "@/lib/jalali";
@@ -117,9 +118,16 @@ export default function SystemsPage() {
           انتقال کاربر با توکن موقت است؛ اتصال پیشرفته امکان نمایش اطلاعات و انجام عملیات از داخل
           رز هاب را فراهم می‌کند (نیازمند API سامانه مقصد).
         </p>
-        <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground flex-wrap">
           <Info className="size-3.5" />
           توکن ورود یکپارچه ۵ دقیقه اعتبار دارد و هر بار ورود، در گزارش فعالیت‌ها ثبت می‌شود.
+          <a
+            href="/sso-docs"
+            className="inline-flex items-center gap-1 text-primary hover:underline"
+          >
+            <BookOpen className="size-3.5" />
+            مستندات اتصال SSO برای تیم‌های فنی
+          </a>
         </div>
       </div>
 

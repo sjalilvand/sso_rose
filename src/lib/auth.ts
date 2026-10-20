@@ -31,27 +31,71 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 // ---------- توکن SSO (توکن دسترسی موقت برای سامانه مقصد) ----------
 
+export const SSO_ISSUER = "rose-hub";
+export const SSO_TTL_SECONDS = 5 * 60; // ۵ دقیقه
+
+/** ساخت شناسه و رمز اختصاصی اتصال برای یک سامانه (مثل client_id / client_secret در OAuth2) */
+export function generateSystemCredentials(name: string): { clientId: string; clientSecret: string } {
+  const slug = name
+    .replace(/[^\u0600-\u06FFa-zA-Z0-9\s-]/g, "")
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.toLowerCase())
+    .filter((w) => /[a-z0-9]/.test(w))
+    .join("-");
+  const suffix = randomBytes(3).toString("hex");
+  return {
+    clientId: `rose-${slug || randomBytes(4).toString("hex")}-${suffix}`,
+    clientSecret: randomBytes(24).toString("hex"),
+  };
+}
+
+/** تضمین وجود مشخصات اتصال برای سامانه — در صورت نبود، تولید و ذخیره می‌کند */
+export async function ensureSystemCredentials(systemId: string) {
+  const system = await db.clinicSystem.findUnique({ where: { id: systemId } });
+  if (!system) throw new Error("سامانه یافت نشد");
+  if (system.clientId && system.clientSecret) {
+    return { clientId: system.clientId, clientSecret: system.clientSecret };
+  }
+  const creds = generateSystemCredentials(system.name);
+  await db.clinicSystem.update({
+    where: { id: systemId },
+    data: { clientId: creds.clientId, clientSecret: creds.clientSecret },
+  });
+  return creds;
+}
+
+/**
+ * صدور توکن موقت SSO (JWT امضاشده با رمز اختصاصی سامانه مقصد).
+ * سامانه مقصد با clientSecret خودش توکن را اعتبارسنجی می‌کند (HS256).
+ */
 export async function signSSOToken(params: {
   userId: string;
   email: string;
   name: string;
+  role: string;
   systemId: string;
   systemName: string;
+  clientId: string;
+  clientSecret: string;
 }): Promise<{ token: string; expiresAt: Date }> {
   const token = await new SignJWT({
     email: params.email,
     name: params.name,
+    role: params.role,
     systemId: params.systemId,
     systemName: params.systemName,
     scope: "sso-launch",
   })
-    .setProtectedHeader({ alg: "HS256" })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setSubject(params.userId)
+    .setAudience(params.clientId)
+    .setJti(randomBytes(12).toString("hex"))
     .setIssuedAt()
-    .setIssuer("rose-hub-sso")
-    .setExpirationTime("5m")
-    .sign(SECRET);
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    .setIssuer(SSO_ISSUER)
+    .setExpirationTime(`${SSO_TTL_SECONDS}s`)
+    .sign(new TextEncoder().encode(params.clientSecret));
+  const expiresAt = new Date(Date.now() + SSO_TTL_SECONDS * 1000);
   return { token, expiresAt };
 }
 

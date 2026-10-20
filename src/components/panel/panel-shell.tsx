@@ -26,6 +26,7 @@ import {
   UserRound,
   Settings,
   Loader2,
+  BookOpen,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -394,6 +395,14 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                       <Link href="/admin/audit">
                         <Settings />
                         <span>گزارش فعالیت‌ها</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/sso-docs")} tooltip="مستندات اتصال SSO">
+                      <Link href="/sso-docs">
+                        <BookOpen />
+                        <span>مستندات اتصال SSO</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

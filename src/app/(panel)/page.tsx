@@ -212,22 +212,35 @@ export default function DashboardPage() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
           {accessible.slice(0, 5).map((s) => (
-            <Link key={s.id} href={`/systems?open=${s.id}`} className="system-card">
-              <Card className="h-full border-border/70">
-                <CardContent className="p-4 flex flex-col gap-2.5">
-                  <SystemIcon name={s.icon} color={s.color} className="size-9" />
-                  <div>
-                    <p className="font-semibold text-sm">{s.name}</p>
-                    <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-5">
-                      {s.description}
-                    </p>
-                  </div>
-                  <span className="mt-auto text-[10px] rounded-full bg-secondary px-2 py-0.5 w-fit text-secondary-foreground">
-                    {s.connectionLevel === "ADVANCED" ? "اتصال پیشرفته" : "اتصال پایه"}
-                  </span>
-                </CardContent>
-              </Card>
-            </Link>
+            <div key={s.id} className="system-card relative">
+              <Link href={`/systems?open=${s.id}`} className="block">
+                <Card className="h-full border-border/70">
+                  <CardContent className="p-4 flex flex-col gap-2.5">
+                    <SystemIcon name={s.icon} color={s.color} className="size-9" />
+                    <div>
+                      <p className="font-semibold text-sm">{s.name}</p>
+                      <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-5">
+                        {s.description}
+                      </p>
+                    </div>
+                    <span className="mt-auto text-[10px] rounded-full bg-secondary px-2 py-0.5 w-fit text-secondary-foreground">
+                      {s.connectionLevel === "ADVANCED" ? "اتصال پیشرفته" : "اتصال پایه"}
+                    </span>
+                  </CardContent>
+                </Card>
+              </Link>
+              {/* لینک مستقیم به سایت سامانه */}
+              <a
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`باز کردن سایت ${s.name}`}
+                aria-label={`باز کردن سایت ${s.name}`}
+                className="absolute top-3 end-3 p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ExternalLink className="size-3.5" />
+              </a>
+            </div>
           ))}
         </div>
       </section>

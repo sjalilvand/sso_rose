@@ -99,6 +99,8 @@ model ClinicSystem {
   color           String          @default("#c2185b")
   connectionLevel ConnectionLevel @default(BASIC)
   status          String          @default("متصل") // وضعیت پایش فنی
+  clientId        String?         @unique // شناسه عمومی سامانه برای اتصال SSO
+  clientSecret    String?         // رمز مشترک اعتبارسنجی توکن SSO (فقط مدیر کل و تیم فنی سامانه)
   sortOrder       Int             @default(0)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
