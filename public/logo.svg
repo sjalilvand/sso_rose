@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="roseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e91e63"/>
+      <stop offset="100%" stop-color="#ad1457"/>
+    </linearGradient>
+    <linearGradient id="jadeGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+  </defs>
+  <!-- گلبرگ‌های رز -->
+  <g transform="translate(32 28)">
+    <path d="M0 -18 C 10 -18 16 -10 14 -2 C 20 2 20 12 12 15 C 10 21 2 24 -4 20 C -12 23 -20 16 -18 8 C -24 2 -20 -8 -12 -9 C -10 -15 -6 -18 0 -18 Z" fill="url(#roseGrad)"/>
+    <path d="M0 -10 C 6 -10 10 -5 9 0 C 12 3 11 9 6 10 C 4 13 -1 14 -4 11 C -9 12 -13 8 -12 4 C -15 0 -12 -5 -7 -5 C -6 -8 -3 -10 0 -10 Z" fill="#f8bbd0" opacity="0.85"/>
+    <circle cx="0" cy="1" r="4" fill="#ad1457"/>
+  </g>
+  <!-- برگ یشمی -->
+  <path d="M40 46 C 46 40 56 40 58 48 C 54 54 44 54 40 46 Z" fill="url(#jadeGrad)"/>
+  <path d="M24 48 C 18 42 8 42 6 50 C 10 56 20 56 24 48 Z" fill="url(#jadeGrad)" opacity="0.8"/>
+  <!-- هاب: خطوط اتصال -->
+  <circle cx="32" cy="55" r="2.5" fill="#c2185b"/>
+  <circle cx="52" cy="55" r="2.5" fill="#0f766e"/>
+  <circle cx="12" cy="55" r="2.5" fill="#0f766e"/>
+  <line x1="14.5" y1="55" x2="29.5" y2="55" stroke="#f48fb1" stroke-width="1.5"/>
+  <line x1="34.5" y1="55" x2="49.5" y2="55" stroke="#f48fb1" stroke-width="1.5"/>
+</svg>

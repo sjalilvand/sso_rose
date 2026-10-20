@@ -1,0 +1,172 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-vazir), "Vazirmatn", "Tahoma", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Sarasa Mono SC", ui-monospace, monospace;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-rose-brand: var(--rose-brand);
+  --color-jade-brand: var(--jade-brand);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* حالت روشن — سفید، رز ملایم، سبز یشمی */
+:root {
+  --radius: 0.75rem;
+  --rose-brand: #c2185b;
+  --jade-brand: #0f766e;
+  --background: oklch(0.99 0.004 5);
+  --foreground: oklch(0.21 0.02 5);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 5);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 5);
+  --primary: oklch(0.56 0.17 5);
+  --primary-foreground: oklch(0.99 0.01 5);
+  --secondary: oklch(0.96 0.015 5);
+  --secondary-foreground: oklch(0.3 0.04 5);
+  --muted: oklch(0.965 0.008 5);
+  --muted-foreground: oklch(0.5 0.02 5);
+  --accent: oklch(0.955 0.025 5);
+  --accent-foreground: oklch(0.3 0.06 5);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.92 0.012 5);
+  --input: oklch(0.92 0.012 5);
+  --ring: oklch(0.65 0.14 5);
+  --chart-1: oklch(0.56 0.17 5);
+  --chart-2: oklch(0.55 0.11 170);
+  --chart-3: oklch(0.72 0.12 60);
+  --chart-4: oklch(0.6 0.15 300);
+  --chart-5: oklch(0.55 0.12 250);
+  --sidebar: oklch(0.975 0.012 5);
+  --sidebar-foreground: oklch(0.21 0.02 5);
+  --sidebar-primary: oklch(0.56 0.17 5);
+  --sidebar-primary-foreground: oklch(0.99 0.01 5);
+  --sidebar-accent: oklch(0.94 0.025 5);
+  --sidebar-accent-foreground: oklch(0.3 0.06 5);
+  --sidebar-border: oklch(0.91 0.02 5);
+  --sidebar-ring: oklch(0.65 0.14 5);
+}
+
+/* حالت تاریک */
+.dark {
+  --background: oklch(0.17 0.012 5);
+  --foreground: oklch(0.93 0.008 5);
+  --card: oklch(0.21 0.015 5);
+  --card-foreground: oklch(0.93 0.008 5);
+  --popover: oklch(0.21 0.015 5);
+  --popover-foreground: oklch(0.93 0.008 5);
+  --primary: oklch(0.66 0.16 5);
+  --primary-foreground: oklch(0.14 0.02 5);
+  --secondary: oklch(0.26 0.02 5);
+  --secondary-foreground: oklch(0.93 0.008 5);
+  --muted: oklch(0.26 0.02 5);
+  --muted-foreground: oklch(0.66 0.02 5);
+  --accent: oklch(0.28 0.03 5);
+  --accent-foreground: oklch(0.93 0.01 5);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(0.29 0.02 5);
+  --input: oklch(0.29 0.02 5);
+  --ring: oklch(0.55 0.14 5);
+  --chart-1: oklch(0.68 0.16 5);
+  --chart-2: oklch(0.65 0.11 170);
+  --chart-3: oklch(0.72 0.12 60);
+  --chart-4: oklch(0.66 0.14 300);
+  --chart-5: oklch(0.64 0.12 250);
+  --sidebar: oklch(0.19 0.015 5);
+  --sidebar-foreground: oklch(0.93 0.008 5);
+  --sidebar-primary: oklch(0.66 0.16 5);
+  --sidebar-primary-foreground: oklch(0.14 0.02 5);
+  --sidebar-accent: oklch(0.27 0.03 5);
+  --sidebar-accent-foreground: oklch(0.93 0.01 5);
+  --sidebar-border: oklch(0.28 0.02 5);
+  --sidebar-ring: oklch(0.55 0.14 5);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-vazir), "Vazirmatn", Tahoma, ui-sans-serif, system-ui, sans-serif;
+  }
+  /* اسکرول‌بار ظریف */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.8 0.02 5);
+    border-radius: 8px;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: oklch(0.35 0.02 5);
+  }
+}
+
+/* کارت گرافیکی سامانه‌ها با هاله رنگی */
+.system-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.system-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.18);
+}
+
+/* متن سایه‌دار برای بنر ورود */
+.text-shadow-soft {
+  text-shadow: 0 2px 12px rgb(0 0 0 / 0.25);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fade-up 0.35s ease both;
+}

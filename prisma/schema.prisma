@@ -1,0 +1,370 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- کاربران و دسترسی‌ها ----------
+
+enum UserRole {
+  SUPER_ADMIN // مدیر کل
+  UNIT_MANAGER // مدیر واحد
+  THERAPIST // درمانگر یا کارشناس
+  STAFF // پذیرش و پشتیبانی
+  TEACHER // مدرس یا همکار آموزشی
+  EXTERNAL // کاربر بیرونی
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+model User {
+  id               String     @id @default(cuid())
+  email            String     @unique
+  passwordHash     String
+  name             String
+  role             UserRole   @default(STAFF)
+  unit             String     @default("عمومی") // واحد سازمانی
+  jobTitle         String     @default("")
+  phone            String     @default("")
+  avatarColor      String     @default("#c2185b")
+  status           UserStatus @default(ACTIVE)
+  twoFactorEnabled Boolean    @default(false)
+  lastLoginAt      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  systemAccess      SystemAccess[]
+  sessions          Session[]
+  tasksAssigned     Task[]         @relation("assignee")
+  tasksCreated      Task[]         @relation("creator")
+  announcements     Announcement[]
+  announcementAcks  AnnouncementAck[]
+  eventsOwned       CalendarEvent[]
+  eventAttendances  EventAttendee[]
+  notes             Note[]
+  noteShares        NoteShare[]
+  conversations     ConversationMember[]
+  messages          Message[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  taskComments      TaskComment[]
+}
+
+// دسترسی هر کاربر به هر سامانه
+model SystemAccess {
+  id        String @id @default(cuid())
+  userId    String
+  systemId  String
+  createdAt DateTime @default(now())
+
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  system ClinicSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, systemId])
+}
+
+// نشست‌های فعال (مدیریت دستگاه‌ها)
+model Session {
+  id        String   @id @default(cuid()) // jti داخل توکن
+  userId    String
+  device    String   @default("نامشخص")
+  ip        String   @default("")
+  createdAt DateTime @default(now())
+  lastSeen  DateTime @default(now())
+  revoked   Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---------- سامانه‌های مجموعه ----------
+
+enum ConnectionLevel {
+  BASIC // اتصال پایه: SSO و انتقال کاربر
+  ADVANCED // اتصال پیشرفته: API و نمایش داده
+}
+
+model ClinicSystem {
+  id              String          @id @default(cuid())
+  name            String
+  url             String
+  description     String          @default("")
+  icon            String          @default("Globe")
+  color           String          @default("#c2185b")
+  connectionLevel ConnectionLevel @default(BASIC)
+  status          String          @default("متصل") // وضعیت پایش فنی
+  sortOrder       Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  access  SystemAccess[]
+  metrics SystemMetric[]
+}
+
+// آمار قابل دریافت از سامانه‌ها (نمونه برای اتصال پیشرفته)
+model SystemMetric {
+  id        String   @id @default(cuid())
+  systemId  String
+  label     String
+  value     String
+  updatedAt DateTime @default(now())
+
+  system ClinicSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+}
+
+// ---------- اطلاعیه‌ها ----------
+
+enum Importance {
+  NORMAL
+  IMPORTANT
+  URGENT
+}
+
+enum AudienceType {
+  ALL
+  UNIT
+  ROLE
+  USERS
+}
+
+model Announcement {
+  id          String       @id @default(cuid())
+  title       String
+  content     String
+  importance  Importance   @default(NORMAL)
+  audience    AudienceType @default(ALL)
+  audienceRef String       @default("") // نام واحد یا نقش یا شناسه‌های کاربر (جدا با ,)
+  requiresAck Boolean      @default(false)
+  pinned      Boolean      @default(false)
+  publishAt   DateTime     @default(now())
+  expireAt    DateTime?
+  authorId    String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  author  User             @relation(fields: [authorId], references: [id])
+  acks    AnnouncementAck[]
+}
+
+model AnnouncementAck {
+  id             String    @id @default(cuid())
+  announcementId String
+  userId         String
+  viewedAt       DateTime  @default(now())
+  acknowledgedAt DateTime?
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+}
+
+// ---------- وظایف ----------
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  NEW
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String       @default("")
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(NEW)
+  startDate   DateTime?
+  dueDate     DateTime?
+  completedAt DateTime?
+  assigneeId  String
+  creatorId   String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  assignee    User          @relation("assignee", fields: [assigneeId], references: [id])
+  creator     User          @relation("creator", fields: [creatorId], references: [id])
+  comments    TaskComment[]
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---------- تقویم ----------
+
+enum EventType {
+  MEETING
+  EVENT
+  CLASS
+  DEADLINE
+  OTHER
+}
+
+enum RepeatType {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model CalendarEvent {
+  id          String     @id @default(cuid())
+  title       String
+  description String     @default("")
+  type        EventType  @default(MEETING)
+  start       DateTime
+  end         DateTime?
+  allDay      Boolean    @default(false)
+  location    String     @default("")
+  repeat      RepeatType @default(NONE)
+  ownerId     String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  owner      User            @relation(fields: [ownerId], references: [id])
+  attendees  EventAttendee[]
+}
+
+model EventAttendee {
+  id       String  @id @default(cuid())
+  eventId  String
+  userId   String
+  response String  @default("PENDING") // PENDING / YES / NO / MAYBE
+
+  event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+// ---------- یادداشت‌ها ----------
+
+enum NoteType {
+  PERSONAL
+  SHARED
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @default("")
+  type      NoteType @default(PERSONAL)
+  color     String   @default("#fde7ef")
+  tags      String   @default("") // جدا با ,
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author  User        @relation(fields: [authorId], references: [id])
+  shares  NoteShare[]
+}
+
+model NoteShare {
+  id     String @id @default(cuid())
+  noteId String
+  userId String
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([noteId, userId])
+}
+
+// ---------- گفتگوها و پیام‌ها ----------
+
+enum ConversationType {
+  DIRECT
+  GROUP
+  CHANNEL
+}
+
+model Conversation {
+  id        String           @id @default(cuid())
+  title     String           @default("") // برای گروه و کانال
+  type      ConversationType @default(DIRECT)
+  creatorId String
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  members  ConversationMember[]
+  messages Message[]
+}
+
+model ConversationMember {
+  id             String    @id @default(cuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime  @default(now())
+  joinedAt       DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  attachment     String   @default("")
+  replyToId      String?
+  pinned         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+}
+
+// ---------- اعلان‌ها ----------
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   @default("info") // info / task / announcement / event / message
+  title     String
+  body      String   @default("")
+  link      String   @default("")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---------- گزارش فعالیت (Audit) ----------
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  userName  String   @default("")
+  action    String
+  entity    String   @default("")
+  details   String   @default("")
+  ip        String   @default("")
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
