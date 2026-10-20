@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Vazirmatn } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
 
-const vazir = Vazirmatn({
+const vazir = localFont({
+  src: "../fonts/Vazirmatn-Variable.ttf",
   variable: "--font-vazir",
-  subsets: ["arabic", "latin"],
+  weight: "100 900",
   display: "swap",
 });
 
