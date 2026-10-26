@@ -18,11 +18,14 @@
 #  پارامترها:
 #    -NoService   : بدون ثبت در Task Scheduler (اجرا فقط دستی)
 #    -SkipBuild   : اگر build قبلی موجود باشد، از build مجدد صرف‌نظر شود
+#    -BaseDir X   : مسیر نصب دلخواه (پیش‌فرض: خودکار — D:\rose-hub در صورت
+#                   قابل نوشتن بودن، وگرنه C:\rose-hub)
 # =====================================================================
 
 param(
     [switch]$NoService,
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [string]$BaseDir = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,7 +48,16 @@ if (-not (Test-IsAdmin)) {
 Write-Host "[1/9] دسترسی Administrator تایید شد." -ForegroundColor Green
 
 # ---------- [2/9] پوشه‌ها ----------
-New-Item -ItemType Directory -Force -Path $AppDir, $LogDir | Out-Null
+# (مسیر نصب توسط config.ps1 با تست واقعیِ قابل‌نوشتن بودن درایو انتخاب می‌شود:
+#  اگر D: قابل نوشتن نباشد — مثلاً CD-ROM مجازی باشد — خودکار C: انتخاب می‌شود)
+try {
+    New-Item -ItemType Directory -Force -Path $AppDir, $LogDir -ErrorAction Stop | Out-Null
+} catch {
+    Write-Host "[خطا] ساخت پوشه‌های نصب در «$BaseDir» ممکن نشد: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "      راه‌حل: مسیر دیگری را دستی بدهید. مثال:" -ForegroundColor Yellow
+    Write-Host '      powershell -ExecutionPolicy Bypass -File deploy.ps1 -BaseDir "C:\rose-hub"' -ForegroundColor Yellow
+    exit 1
+}
 Write-Host ("[2/9] پوشه نصب آماده است: {0}" -f $BaseDir) -ForegroundColor Green
 
 # ---------- [3/9] پیش‌نیازها: Git و Node.js ----------

@@ -21,18 +21,59 @@ $NodeVersion = "22.14.0"
 # --- نام سرویس در Task Scheduler ویندوز ---
 $TaskName = "RoseHub"
 
-# --- مسیر نصب: اگر درایو D موجود باشد D:\rose-hub وگرنه C:\rose-hub ---
-if (Test-Path "D:\") { $BaseDir = "D:\rose-hub" } else { $BaseDir = "C:\rose-hub" }
-$AppDir  = Join-Path $BaseDir "app"
-$LogDir  = Join-Path $BaseDir "logs"
-$LogFile = Join-Path $LogDir "rose-hub.log"
-
 # --- محل فایل توکن (این فایل gitignore شده و هرگز push نمی‌شود) ---
 $TokenFile = Join-Path $PSScriptRoot "github-token.txt"
 
 # ---------------------------------------------------------------------
 #  توابع کمکی مشترک
 # ---------------------------------------------------------------------
+
+function Test-DirWritable {
+    # بررسی واقعیِ قابل‌نوشتن بودن ریشه یک درایو
+    # (وجود درایو کافی نیست! در سرورهای مجازی معمولاً D: یک درایو CD-ROM
+    #  مجازی است یا قفل/بدون دسترسی — در این حالت باید به C: برگردیم)
+    param([string]$DriveRoot)
+    try {
+        $probe = Join-Path $DriveRoot ("rose-write-test-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+        New-Item -ItemType Directory -Path $probe -Force -ErrorAction Stop | Out-Null
+        Remove-Item -Path $probe -Force -ErrorAction SilentlyContinue
+        return $true
+    } catch { return $false }
+}
+
+function Resolve-RoseBaseDir {
+    # انتخاب مسیر نصب به این ترتیب:
+    #   1) اگر caller (مثلاً deploy.ps1 -BaseDir یا local-config) مقدار داده، همان
+    #   2) اگر قبلاً جایی نصب شده (پوشه app\.git موجود است)، همان مسیر حفظ شود
+    #   3) درایو D اگر «واقعاً» قابل نوشتن باشد
+    #   4) درایو C اگر قابل نوشتن باشد
+    #   5) در نهایت C:\rose-hub (با هشدار)
+    param([string]$Preferred = "")
+    if ($Preferred) {
+        # اگر کاربر مسیر ریشه درایو داد (مثل C:\) نباید اسلش آخر حذف شود
+        $p = $Preferred.Trim()
+        if ($p.Length -gt 3) { $p = $p.TrimEnd("\") }
+        return $p
+    }
+
+    $candidates = @("D:\rose-hub", "C:\rose-hub")
+
+    # اولویت: نصب موجود (تا مسیر بین اجراهای مختلف ثابت بماند)
+    foreach ($c in $candidates) {
+        if (Test-Path (Join-Path $c "app\.git")) { return $c }
+    }
+
+    foreach ($c in $candidates) {
+        $drive = (Split-Path -Path $c -Qualifier) + "\"
+        if (-not (Test-Path $drive)) { continue }
+        if (Test-DirWritable -DriveRoot $drive) { return $c }
+        Write-Host ("[هشدار] درایو {0} قابل نوشتن نیست (احتمالاً CD-ROM مجازی یا بدون دسترسی است)؛ مسیر بعدی بررسی می‌شود..." -f $drive) -ForegroundColor Yellow
+    }
+
+    Write-Host "[هشدار] هیچ درایو قابل نوشتنی پیدا نشد؛ C:\rose-hub در نظر گرفته می‌شود." -ForegroundColor Yellow
+    Write-Host "        اگر مشکل ادامه داشت، پنجره PowerShell را با Run as Administrator باز کنید." -ForegroundColor Yellow
+    return "C:\rose-hub"
+}
 
 function Get-GitToken {
     # توکن را به ترتیب از این منابع می‌خواند:
@@ -44,7 +85,7 @@ function Get-GitToken {
         $t = Get-Content $TokenFile -Raw -ErrorAction SilentlyContinue
         if ($t) { $t = $t.Trim(); if ($t) { return $t } }
     }
-    if (Test-Path (Join-Path $AppDir ".git")) {
+    if ($AppDir -and (Test-Path (Join-Path $AppDir ".git"))) {
         $u = $null
         try { $u = git -C $AppDir remote get-url origin 2>$null } catch { $u = $null }
         if ($u -and ($u -is [string]) -and $u -match "https://([^@/]+)@github\.com") { return $Matches[1] }
@@ -133,6 +174,15 @@ function Show-RoseUrls {
     Write-Host "  ورود مدیر کل: admin@rose.ir / rose1234  (بعد از راه‌اندازی رمز را عوض کنید!)" -ForegroundColor Gray
 }
 
-# --- تنظیمات محلی اختیاری (بازنویسی مقادیر بالا) ---
+# --- تشخیص خودکار مسیر نصب (اگر caller مقدار نداده باشد) ---
+# $BaseDir ممکن است قبلاً توسط پارامتر -BaseDir یا local-config مقدار گرفته باشد
+if (-not $BaseDir) { $BaseDir = Resolve-RoseBaseDir }
+
+# --- تنظیمات محلی اختیاری (بازنویسی مقادیر بالا؛ مثلاً $BaseDir) ---
 $LocalConfigPath = Join-Path $PSScriptRoot "local-config.ps1"
 if (Test-Path $LocalConfigPath) { . $LocalConfigPath }
+
+# --- مسیرهای مشتق‌شده (بعد از local-config محاسبه می‌شود تا بازنویسی اعمال شود) ---
+$AppDir  = Join-Path $BaseDir "app"
+$LogDir  = Join-Path $BaseDir "logs"
+$LogFile = Join-Path $LogDir "rose-hub.log"

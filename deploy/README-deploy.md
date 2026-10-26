@@ -137,6 +137,13 @@ $env:DATABASE_URL="file:" + ((Get-Location).Path + "/db/custom.db"); npx prisma 
 
 ## رفع اشکال (Troubleshooting)
 
+**`Access to the path 'rose-hub' is denied` هنگام شروع نصب**
+- در سرورهای مجازی معمولاً درایو `D:` یک **CD-ROM مجازی** است یا قفل/بدون دسترسی؛
+  اسکریپت‌های جدید با «تست واقعیِ نوشتن» این را تشخیص می‌دهند و خودکار روی
+  `C:\rose-hub` نصب می‌کنند. کافی است بوت‌استرپ را دوباره اجرا کنید.
+- اگر خواستید مسیر را دستی تعیین کنید:
+  `powershell -ExecutionPolicy Bypass -File "$env:TEMP\rose-hub-bootstrap.ps1" -BaseDir "C:\rose-hub"`
+
 **برنامه بالا نمی‌آید / پورت پاسخ نمی‌دهد**
 1. `status.ps1` را اجرا کنید تا وضعیت سرویس و پورت‌ها معلوم شود.
 2. `logs.ps1 -Tail 200` — خطای دقیق در لاگ هست.
