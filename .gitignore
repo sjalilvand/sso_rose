@@ -56,3 +56,15 @@ server.log
 /.zscripts/
 /tool-results/
 /scripts/gen-doc-*
+
+# ---- Deployment (Rose Hub) ----
+# دیتابیس زنده runtime هرگز کامیت نمی‌شود؛ تمپلیت آن در deploy/db-template نگه‌داری می‌شود
+/db/*.db
+/db/*.db-journal
+/db/*.db-wal
+/db/*.db-shm
+
+# اطلاعات محرمانه سرور (هرگز push نشود)
+deploy/github-token.txt
+deploy/local-config.ps1
+

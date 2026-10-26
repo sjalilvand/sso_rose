@@ -64,23 +64,36 @@
 - فونت: وزیرمتن (Vazirmatn)
 - تقویم شمسی: پیاده‌سازی الگوریتم استاندارد جلالی (`src/lib/jalali.ts`)
 
-## اجرا
+## اجرا (توسعه محلی)
 
 ```bash
 # نصب وابستگی‌ها
-bun install
+npm install
 
-# ایجاد پایگاه داده
-bun run db:push
-
-# داده‌های اولیه (کاربران، سامانه‌ها، وظایف نمونه)
-bun run scripts/seed.ts
+# ایجاد پایگاه داده (یا کپی از deploy/db-template/custom.db — دیتابیس نمونه آماده دارد)
+npm run db:push
 
 # اجرای سرور توسعه
-bun run dev
+npm run dev
 ```
 
 سپس `http://localhost:3000` را باز کنید.
+
+### استقرار روی ویندوز سرور (Production — بدون داکر)
+
+برای نصب کامل روی Windows Server با پورت **8088 (فرانت)** و **3008 (بک‌اند)**،
+سرویس ویندوزی با شروع خودکار، نصب خودکار Node.js و بدون نیاز به داکر، پوشه
+**`deploy/`** را ببینید: [`deploy/README-deploy.md`](deploy/README-deploy.md)
+
+```powershell
+# اجرای یک‌خطی روی سرور (PowerShell با دسترسی Administrator):
+[Net.ServicePointManager]::SecurityProtocol='Tls12'
+irm https://raw.githubusercontent.com/sjalilvand/sso_rose/main/deploy/bootstrap.ps1 -OutFile "$env:TEMP\rose-hub-bootstrap.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:TEMP\rose-hub-bootstrap.ps1"
+```
+
+مدیریت روزانه: `deploy\update.ps1` (به‌روزرسانی از گیت)، `deploy\status.ps1`،
+`deploy\start.ps1` / `stop.ps1` / `restart.ps1`، `deploy\logs.ps1 -Follow`.
 
 ### متغیرهای محیطی
 

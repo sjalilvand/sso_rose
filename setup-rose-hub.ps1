@@ -60,7 +60,19 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "[خطا] prisma generate ناموفق بود." -ForegroundColor Red
     Read-Host "برای بستن Enter بزنید"; exit 1
 }
-Write-Host "      دیتابیس آماده است (db/custom.db با داده‌های نمایشی)." -ForegroundColor Green
+
+# --- 4.5) آماده‌سازی دیتابیس نمایشی (از تمپلیت) ---
+if (-not (Test-Path "$Target\db\custom.db")) {
+    New-Item -ItemType Directory -Force -Path "$Target\db" | Out-Null
+    Copy-Item "$Target\deploy\db-template\custom.db" "$Target\db\custom.db"
+    Write-Host "      دیتابیس نمایشی از deploy\db-template ساخته شد." -ForegroundColor Green
+} else {
+    Write-Host "      دیتابیس موجود حفظ شد (db\custom.db)." -ForegroundColor Green
+}
+# فایل .env در صورت نبود از مقدار پیش‌فرض ساخته می‌شود
+if (-not (Test-Path "$Target\.env")) {
+    "DATABASE_URL=file:../db/custom.db" | Out-File -FilePath "$Target\.env" -Encoding ascii
+}
 
 # --- 5) اجرای برنامه ---
 Write-Host "[5/5] اجرای برنامه..." -ForegroundColor Green
