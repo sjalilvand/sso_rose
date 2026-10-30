@@ -1,15 +1,20 @@
 # =============================================================================
-#  update-rosehub.ps1 — به‌روزرسانی رز هاب روی سرور از گیت‌هاب
-#  کارها: git pull + npm install + prisma + اصلاح نام/نشانی سامانه‌ها در دیتابیس
-#         + build + ری‌استارت PM2 + تست سلامت
-#  استفاده:
+#  update-rosehub.ps1 - Update Rose Hub on the server from GitHub
+#  Steps: git sync + npm install + prisma + sync system names/urls in DB
+#         + production build + PM2 restart + health check
+#  Usage:
 #     powershell -ExecutionPolicy Bypass -File C:\update-rosehub.ps1
-#  پارامترها (اختیاری):
-#     -InstallDir "C:\RoseHub"   مسیر نصب
-#     -Port 8082                 پورت اجرا
-#     -GitHubToken "ghp_..."     فقط اگر مخزن خصوصی شده باشد
-#  نکته: فایل‌های untracked مانند .env و دیتابیس rose.db دست‌نخورده می‌مانند.
+#  Optional parameters:
+#     -InstallDir "C:\RoseHub"   install folder
+#     -Port 8082                 app port
+#     -GitHubToken "ghp_..."     only if the repo becomes private
+#  NOTE: written in pure ASCII on purpose - PowerShell 5.1 mis-decodes
+#        UTF-8 scripts without BOM on some system locales, which breaks
+#        Persian string literals. Keep this file ASCII-only.
+#        Untracked files (.env, rose.db) are never touched by git reset.
 # =============================================================================
+
+#requires -Version 5.1
 
 param(
     [string]$InstallDir  = "C:\RoseHub",
@@ -31,35 +36,35 @@ function Refresh-Path {
 }
 Refresh-Path
 
-# ---------- گام ۱: بررسی پوشه نصب ----------
-Write-Step "گام ۱/۷ — بررسی پوشه نصب رز هاب"
+# ---------- Step 1/7: check install folder ----------
+Write-Step "Step 1/7 - Check install folder"
 if (-not (Test-Path (Join-Path $InstallDir "package.json"))) {
-    throw "رز هاب در $InstallDir یافت نشد — ابتدا deploy-rose-hub.ps1 را اجرا کنید."
+    throw "Rose Hub not found in $InstallDir - run deploy-rose-hub.ps1 first."
 }
 Set-Location $InstallDir
-Write-Ok "مسیر نصب: $InstallDir"
+Write-Ok "Install folder: $InstallDir"
 
-# ---------- گام ۲: همگام‌سازی کد از گیت‌هاب ----------
-Write-Step "گام ۲/۷ — همگام‌سازی کد از گیت‌هاب"
+# ---------- Step 2/7: sync code from GitHub ----------
+Write-Step "Step 2/7 - Sync code from GitHub"
 if ($GitHubToken -ne "") {
     git remote set-url origin "https://sjalilvand:$GitHubToken@github.com/sjalilvand/sso_rose.git" 2>$null
 }
 git fetch origin main 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "دسترسی به گیت‌هاب ممکن نشد (اینترنت/توکن را بررسی کنید)" }
+if ($LASTEXITCODE -ne 0) { throw "Cannot reach GitHub (check internet / token)" }
 
-$localCommit = (git rev-parse HEAD).Trim()
+$localCommit  = (git rev-parse HEAD).Trim()
 $remoteCommit = (git rev-parse origin/main).Trim()
 if ($localCommit -eq $remoteCommit) {
-    Write-Ok "کد از قبل آخرین نسخه است ($($localCommit.Substring(0,7)))"
+    Write-Ok "Code is already up to date ($($localCommit.Substring(0,7)))"
 } else {
-    # تغییرات موضعی روی فایل‌های tracked نادیده گرفته می‌شود؛ untracked (مثل .env و rose.db) حفظ می‌شود
+    # Local edits to tracked files are discarded; untracked files (.env, rose.db) survive
     git reset --hard origin/main 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "git reset ناموفق بود" }
-    Write-Ok "کد به $($remoteCommit.Substring(0,7)) به‌روز شد (فایل‌های محلی مانند .env و rose.db دست‌نخورده ماندند)"
+    if ($LASTEXITCODE -ne 0) { throw "git reset failed" }
+    Write-Ok "Code updated to $($remoteCommit.Substring(0,7)) (local files like .env and rose.db kept)"
 }
 
-# ---------- گام ۳: نصب وابستگی‌ها (میرور ایرانی با fallback) ----------
-Write-Step "گام ۳/۷ — نصب وابستگی‌های npm"
+# ---------- Step 3/7: npm install (Iranian mirror first, then default) ----------
+Write-Step "Step 3/7 - Install npm dependencies"
 $mirror = "https://archive.ito.gov.ir/mirror2/npm/"
 $useRegistry = ""
 try {
@@ -67,45 +72,45 @@ try {
     if ($probe.StatusCode -lt 500) { $useRegistry = $mirror }
 } catch {}
 if ($useRegistry -ne "") {
-    Write-Host "  npm install از میرور $mirror ..."
+    Write-Host "  npm install from mirror $mirror ..."
     npm install --registry $useRegistry --no-audit --no-fund 2>$null
 }
 if ($LASTEXITCODE -ne 0) {
-    Write-Warn2 "نصب از میرور ناموفق بود — تلاش با رجیستری رسمی"
+    Write-Warn2 "Mirror install failed - retrying with the official registry"
     npm install --no-audit --no-fund 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "npm install ناموفق بود" }
+    if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
 }
-Write-Ok "وابستگی‌ها نصب شدند"
+Write-Ok "Dependencies installed"
 
-# ---------- گام ۴: Prisma (کلاینت + همگام‌سازی اسکیما) ----------
-Write-Step "گام ۴/۷ — Prisma (generate + db push)"
+# ---------- Step 4/7: Prisma (client + schema sync) ----------
+Write-Step "Step 4/7 - Prisma (generate + db push)"
 npx prisma generate 2>$null
-if ($LASTEXITCODE -ne 0) { throw "prisma generate ناموفق بود" }
+if ($LASTEXITCODE -ne 0) { throw "prisma generate failed" }
 npx prisma db push --accept-data-loss --skip-generate 2>$null
-if ($LASTEXITCODE -ne 0) { Write-Warn2 "prisma db push ناموفق بود — اگر اسکیما تغییری نکرده باشد مشکلی نیست" }
-Write-Ok "Prisma آماده است"
+if ($LASTEXITCODE -ne 0) { Write-Warn2 "prisma db push failed - harmless if the schema did not change" }
+Write-Ok "Prisma ready"
 
-# ---------- گام ۵: اصلاح نام و نشانی سامانه‌ها در دیتابیس ----------
-Write-Step "گام ۵/۷ — همگام‌سازی نام و نشانی سامانه‌ها در دیتابیس"
+# ---------- Step 5/7: sync system names and urls in the database ----------
+Write-Step "Step 5/7 - Sync system names/urls in database"
 if (Test-Path "scripts\bind-sso-systems.cjs") {
     node scripts/bind-sso-systems.cjs
     if ($LASTEXITCODE -eq 0) {
-        Write-Ok "نام و نشانی سامانه‌ها (رز سای / رز سنتر / حضور و غیاب) همگام شد"
+        Write-Ok "System names/urls synced (Rose Psy / Rose Center / Attendance)"
     } else {
-        Write-Warn2 "اجرای bind-sso-systems ناموفق بود — بعداً دستی اجرا کنید: node scripts\bind-sso-systems.cjs"
+        Write-Warn2 "bind-sso-systems failed - run manually later: node scripts\bind-sso-systems.cjs"
     }
 } else {
-    Write-Warn2 "scripts\bind-sso-systems.cjs یافت نشد — رد شد"
+    Write-Warn2 "scripts\bind-sso-systems.cjs not found - skipped"
 }
 
-# ---------- گام ۶: ساخت نسخه production ----------
-Write-Step "گام ۶/۷ — build نسخه production (چند دقیقه)"
+# ---------- Step 6/7: production build ----------
+Write-Step "Step 6/7 - Production build (a few minutes)"
 npm run build 2>$null
-if ($LASTEXITCODE -ne 0) { throw "build ناموفق بود — خروجی بالا را بررسی کنید" }
-Write-Ok "build کامل شد (.next)"
+if ($LASTEXITCODE -ne 0) { throw "build failed - check the output above" }
+Write-Ok "Build completed (.next)"
 
-# ---------- گام ۷: ری‌استارت PM2 و تست سلامت ----------
-Write-Step "گام ۷/۷ — ری‌استارت برنامه (PM2)"
+# ---------- Step 7/7: restart PM2 and health check ----------
+Write-Step "Step 7/7 - Restart app (PM2)"
 $pm2Name = "rose-hub"
 $inList = $false
 try {
@@ -114,15 +119,15 @@ try {
 } catch {}
 if ($inList) {
     pm2 restart $pm2Name --update-env 2>$null | Out-Null
-    Write-Ok "PM2: $pm2Name ری‌استارت شد"
+    Write-Ok "PM2: $pm2Name restarted"
 } else {
     pm2 start ecosystem.config.js 2>$null | Out-Null
     pm2 save 2>$null | Out-Null
-    Write-Ok "PM2: برنامه از ecosystem.config.js اجرا شد"
+    Write-Ok "PM2: app started from ecosystem.config.js"
 }
 
 Write-Host ""
-Write-Step "بررسی سلامت"
+Write-Step "Health check"
 $healthy = $false
 for ($i = 0; $i -lt 15; $i++) {
     try {
@@ -131,18 +136,18 @@ for ($i = 0; $i -lt 15; $i++) {
     } catch { Start-Sleep -Seconds 2 }
 }
 if ($healthy) {
-    Write-Ok "رز هاب روی پورت $Port سالم است"
+    Write-Ok "Rose Hub is healthy on port $Port"
     Write-Host ""
     Write-Host "================================================================="
-    Write-Host "  به‌روزرسانی رز هاب کامل شد"
+    Write-Host "  Rose Hub update finished"
     Write-Host "================================================================="
-    Write-Host "  نشانی            : http://130.185.73.157:$Port"
-    Write-Host "  تغییرات این نسخه :"
-    Write-Host "    - مدیریت کامل کاربران: افزودن، ویرایش کامل (نام، ایمیل، رمز، نقش،"
-    Write-Host "      وضعیت، مجوز سامانه‌ها) و حذف کامل با تأیید"
-    Write-Host "    - نام سامانهٔ پورت 8085 از «تکنورز» به «حضور و غیاب» اصلاح شد"
-    Write-Host "  نکته: پس از بازکردن صفحه Ctrl+F5 بزنید تا کش مرورگر پاک شود."
+    Write-Host "  URL              : http://130.185.73.157:$Port"
+    Write-Host "  In this version  :"
+    Write-Host "    - Full user management: add, full edit (name, email, password,"
+    Write-Host "      role, status, per-system access) and hard delete with confirm"
+    Write-Host "    - Port-8085 system renamed from 'Technorz' to 'Attendance'"
+    Write-Host "  Tip: press Ctrl+F5 in the browser to bypass the cache."
     Write-Host "================================================================="
 } else {
-    Write-Warn2 "برنامه پاسخ نداد — بررسی: pm2 logs rose-hub"
+    Write-Warn2 "App did not respond - check: pm2 logs rose-hub"
 }
