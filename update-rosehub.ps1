@@ -179,20 +179,31 @@ if ($dbHad) {
 Write-Step "Step 5/9 - Install npm dependencies"
 $mirror = "https://archive.ito.gov.ir/mirror2/npm/"
 $useRegistry = ""
+# probe with a real small package doc: proves the mirror is up AND serves our packages
 try {
-    $probe = Invoke-WebRequest -Uri $mirror -Method Head -UseBasicParsing -TimeoutSec 8
+    $probe = Invoke-WebRequest -Uri ($mirror + "xlsx/latest") -Method Get -UseBasicParsing -TimeoutSec 10
     if ($probe.StatusCode -lt 500) { $useRegistry = $mirror }
 } catch {}
 if ($useRegistry -ne "") {
     Write-Host "  npm install from mirror $mirror ..."
     npm install --registry $useRegistry --no-audit --no-fund
-}
-if ($LASTEXITCODE -ne 0) {
-    Write-Warn2 "Mirror install failed - retrying with the official registry"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn2 "Mirror install failed - retrying with the official registry"
+        npm install --no-audit --no-fund
+    }
+} else {
+    Write-Warn2 "npm mirror is not reachable - using the official registry"
     npm install --no-audit --no-fund
-    if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
 }
-Write-Ok "Dependencies installed"
+if ($LASTEXITCODE -ne 0) { throw "npm install failed - check the output above" }
+
+# make sure the xlsx package (Excel import) really landed in node_modules
+if (-not (Test-Path "node_modules\xlsx\package.json")) {
+    Write-Warn2 "xlsx package is missing - installing it directly"
+    npm install xlsx@0.18.5 --no-audit --no-fund
+    if (-not (Test-Path "node_modules\xlsx\package.json")) { throw "xlsx package could not be installed" }
+}
+Write-Ok "Dependencies installed (xlsx present)"
 
 # ---------- Step 6/9: Prisma (client + schema sync) ----------
 Write-Step "Step 6/9 - Prisma (generate + db push)"
