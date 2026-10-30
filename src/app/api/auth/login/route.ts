@@ -7,6 +7,7 @@ import {
   deviceFromRequest,
   ipFromRequest,
   verifyOTP,
+  normalizeIdentifier,
   ApiError,
 } from "@/lib/auth";
 import { apiError } from "@/lib/api";
@@ -18,14 +19,16 @@ export async function POST(req: NextRequest) {
       password?: string;
       otpCode?: string;
     };
-    if (!email || !password) throw new ApiError("ایمیل و رمز عبور الزامی است", 400);
+    if (!email || !password) throw new ApiError("ایمیل/کد ملی و رمز عبور الزامی است", 400);
 
-    const user = await db.user.findUnique({
-      where: { email: email.trim().toLowerCase() },
+    // ورود با ایمیل سازمانی یا کد ملی (ارقام فارسی هم پذیرفته می‌شود)
+    const identifier = normalizeIdentifier(email);
+    const user = await db.user.findFirst({
+      where: { OR: [{ email: identifier }, { username: identifier }] },
     });
     if (!user || !verifyPassword(password, user.passwordHash)) {
-      await audit({ action: "تلاش ناموفق ورود", entity: "auth", details: email, ip: ipFromRequest(req) });
-      throw new ApiError("ایمیل یا رمز عبور نادرست است", 401);
+      await audit({ action: "تلاش ناموفق ورود", entity: "auth", details: identifier, ip: ipFromRequest(req) });
+      throw new ApiError("ایمیل/کد ملی یا رمز عبور نادرست است", 401);
     }
     if (user.status === "SUSPENDED")
       throw new ApiError("حساب شما به حالت تعلیق درآمده است. با مدیر سامانه تماس بگیرید.", 403);

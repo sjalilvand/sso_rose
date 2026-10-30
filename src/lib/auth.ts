@@ -11,6 +11,21 @@ const SECRET = new TextEncoder().encode(
   process.env.AUTH_SECRET || "rose-hub-dev-secret-change-in-production-2024"
 );
 
+/** شناسه ورود را نرمال می‌کند: ارقام فارسی → لاتین و حذف فاصله */
+export function normalizeIdentifier(raw: string): string {
+  let out = "";
+  for (const ch of raw.trim().toLowerCase()) {
+    const fa = "۰۱۲۳۴۵۶۷۸۹".indexOf(ch);
+    if (fa >= 0) {
+      out += String(fa);
+      continue;
+    }
+    const ar = "٠١٢٣٤٥٦٧٨٩".indexOf(ch);
+    out += ar >= 0 ? String(ar) : ch;
+  }
+  return out.replace(/[\s\u200c]/g, "");
+}
+
 // ---------- رمز عبور ----------
 
 export function hashPassword(password: string): string {
@@ -78,11 +93,13 @@ export async function signSSOToken(params: {
   systemName: string;
   clientId: string;
   clientSecret: string;
+  username?: string | null; // کد ملی — شناسه پایدار برای سامانه مقصد
 }): Promise<{ token: string; expiresAt: Date }> {
   const token = await new SignJWT({
     email: params.email,
     name: params.name,
     role: params.role,
+    nationalId: params.username || null,
     systemId: params.systemId,
     systemName: params.systemName,
     scope: "sso-launch",
@@ -104,6 +121,7 @@ export async function signSSOToken(params: {
 export interface AuthUser {
   id: string;
   email: string;
+  username: string | null; // کد ملی
   name: string;
   role: User["role"];
   unit: string;
@@ -137,6 +155,7 @@ export async function getAuthUser(req: Request): Promise<AuthUser | null> {
   return {
     id: user.id,
     email: user.email,
+    username: user.username,
     name: user.name,
     role: user.role,
     unit: user.unit,

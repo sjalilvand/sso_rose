@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/input-otp";
-import { Loader2, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { Loader2, Lock, User, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 
@@ -74,14 +74,15 @@ function LoginForm() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="email">ایمیل سازمانی</Label>
+        <Label htmlFor="email">ایمیل سازمانی یا کد ملی</Label>
         <div className="relative">
-          <Mail className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <User className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             id="email"
-            type="email"
+            type="text"
             dir="ltr"
-            placeholder="name@rose.ir"
+            autoComplete="username"
+            placeholder="name@rose.ir یا کد ملی"
             className="pr-9 text-left"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -192,7 +193,7 @@ export default function LoginPage() {
           <Card className="border-border/60 shadow-lg shadow-rose-100/40 dark:shadow-none">
             <CardHeader className="text-center">
               <CardTitle className="text-xl">ورود به حساب کاربری</CardTitle>
-              <CardDescription>با یک ورود، به سامانه‌های مجاز خود دسترسی پیدا کنید</CardDescription>
+              <CardDescription>با ایمیل یا کد ملی و یک رمز عبور وارد شوید</CardDescription>
             </CardHeader>
             <CardContent>
               <Suspense fallback={<div className="h-40" />}>

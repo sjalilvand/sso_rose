@@ -63,6 +63,10 @@ import {
   Search,
   Trash2,
   UserX,
+  FileSpreadsheet,
+  Download,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatShortJalali, faNum } from "@/lib/jalali";
@@ -70,16 +74,68 @@ import { formatShortJalali, faNum } from "@/lib/jalali";
 interface U {
   id: string;
   email: string;
+  username?: string | null; // کد ملی — نام کاربری ورود
   name: string;
   role: string;
   unit: string;
   jobTitle: string;
   phone: string;
+  province?: string;
+  education?: string;
+  workLicense?: string;
+  profRank?: string;
+  contractNo?: string;
+  provinceCode?: string;
+  personalCode?: string;
+  bankSheba?: string;
   avatarColor: string;
   status: string;
   twoFactorEnabled: boolean;
   lastLoginAt: string | null;
   systemIds?: string[];
+}
+
+interface ImportRowT {
+  row: number;
+  province: string;
+  name: string;
+  education: string;
+  workLicense: string;
+  profRank: string;
+  contractNo: string;
+  provinceCode: string;
+  personalCode: string;
+  bankSheba: string;
+  nationalId: string;
+  phone: string;
+  nidValid: boolean;
+  action: "create" | "update";
+  error?: string;
+}
+
+interface ImportSummary {
+  total: number;
+  create: number;
+  update: number;
+  error: number;
+}
+
+interface CommitResult {
+  created: number;
+  updated: number;
+  failed: Array<{ row: number; name: string; reason: string }>;
+  total: number;
+  fileName: string;
+}
+
+/** ارسال FormData (برای آپلود فایل اکسل) با مدیریت خطای فارسی */
+async function apiForm<T = unknown>(url: string, form: FormData): Promise<T> {
+  const res = await fetch(url, { method: "POST", body: form, cache: "no-store" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error((data as { error?: string }).error || "خطا در ارتباط با سرور");
+  }
+  return data as T;
 }
 
 interface Sys {
@@ -121,11 +177,22 @@ export default function AdminUsersPage() {
   const [eColor, setEColor] = useState(AVATAR_COLORS[2]);
   const [ePass, setEPass] = useState("");
   const [eSystems, setESystems] = useState<string[]>([]);
+  // مشخصات پرونده (مطابق فایل مشاورین)
+  const [eNid, setENid] = useState("");
+  const [eProvince, setEProvince] = useState("");
+  const [eEdu, setEEdu] = useState("");
+  const [eLicense, setELicense] = useState("");
+  const [eRank, setERank] = useState("");
+  const [eContract, setEContract] = useState("");
+  const [eProvCode, setEProvCode] = useState("");
+  const [ePersonal, setEPersonal] = useState("");
+  const [eSheba, setESheba] = useState("");
 
   // دیالوگ کاربر جدید
   const [createOpen, setCreateOpen] = useState(false);
   const [fName, setFName] = useState("");
   const [fEmail, setFEmail] = useState("");
+  const [fNid, setFNid] = useState("");
   const [fPass, setFPass] = useState("");
   const [fRole, setFRole] = useState("STAFF");
   const [fUnit, setFUnit] = useState("پذیرش");
@@ -133,6 +200,20 @@ export default function AdminUsersPage() {
   const [fPhone, setFPhone] = useState("");
   const [fColor, setFColor] = useState(AVATAR_COLORS[2]);
   const [fSystems, setFSystems] = useState<string[]>([]);
+
+  // ورود گروهی از فایل اکسل
+  const [importOpen, setImportOpen] = useState(false);
+  const [impPhase, setImpPhase] = useState<"pick" | "preview" | "done">("pick");
+  const [impFile, setImpFile] = useState<File | null>(null);
+  const [impRows, setImpRows] = useState<ImportRowT[]>([]);
+  const [impSummary, setImpSummary] = useState<ImportSummary | null>(null);
+  const [impRole, setImpRole] = useState("THERAPIST");
+  const [impUnit, setImpUnit] = useState("درمان");
+  const [impTitle, setImpTitle] = useState("مشاور");
+  const [impReset, setImpReset] = useState(true);
+  const [impSystems, setImpSystems] = useState<string[]>([]);
+  const [impResult, setImpResult] = useState<CommitResult | null>(null);
+  const [impBusy, setImpBusy] = useState(false);
 
   // تأیید حذف کامل
   const [deleteTarget, setDeleteTarget] = useState<U | null>(null);
@@ -163,7 +244,9 @@ export default function AdminUsersPage() {
           !search ||
           u.name.includes(search) ||
           u.email.includes(search) ||
-          u.unit.includes(search)
+          u.unit.includes(search) ||
+          (u.phone || "").includes(search) ||
+          (u.username || "").includes(search)
       ),
     [users, search]
   );
@@ -181,6 +264,7 @@ export default function AdminUsersPage() {
         body: {
           name: fName,
           email: fEmail,
+          username: fNid,
           password: fPass,
           role: fRole,
           unit: fUnit,
@@ -194,6 +278,7 @@ export default function AdminUsersPage() {
       setCreateOpen(false);
       setFName("");
       setFEmail("");
+      setFNid("");
       setFPass("");
       setFTitle("");
       setFPhone("");
@@ -219,6 +304,15 @@ export default function AdminUsersPage() {
     setEColor(u.avatarColor || AVATAR_COLORS[2]);
     setEPass("");
     setESystems(u.systemIds || []);
+    setENid(u.username || "");
+    setEProvince(u.province || "");
+    setEEdu(u.education || "");
+    setELicense(u.workLicense || "");
+    setERank(u.profRank || "");
+    setEContract(u.contractNo || "");
+    setEProvCode(u.provinceCode || "");
+    setEPersonal(u.personalCode || "");
+    setESheba(u.bankSheba || "");
     setEditOpen(true);
   }
 
@@ -239,6 +333,7 @@ export default function AdminUsersPage() {
         body: {
           name: eName,
           email: eEmail,
+          username: eNid,
           phone: ePhone,
           jobTitle: eTitle,
           role: eRole,
@@ -246,6 +341,14 @@ export default function AdminUsersPage() {
           status: eStatus,
           avatarColor: eColor,
           systemIds: eSystems,
+          province: eProvince,
+          education: eEdu,
+          workLicense: eLicense,
+          profRank: eRank,
+          contractNo: eContract,
+          provinceCode: eProvCode,
+          personalCode: ePersonal,
+          bankSheba: eSheba,
           ...(ePass ? { password: ePass } : {}),
         },
       });
@@ -307,6 +410,62 @@ export default function AdminUsersPage() {
     }
   }
 
+  // ---------- ورود گروهی از فایل اکسل ----------
+  function openImport() {
+    setImpPhase("pick");
+    setImpFile(null);
+    setImpRows([]);
+    setImpSummary(null);
+    setImpResult(null);
+    // پیش‌فرض: سامانه حضور و غیاب (پورت 8085) برای مشاورین انتخاب باشد
+    setImpSystems(systems.filter((s) => s.url.includes(":8085")).map((s) => s.id));
+    setImportOpen(true);
+  }
+
+  async function previewImport() {
+    if (!impFile) {
+      toast.error("ابتدا فایل اکسل را انتخاب کنید");
+      return;
+    }
+    setImpBusy(true);
+    try {
+      const form = new FormData();
+      form.append("file", impFile);
+      form.append("mode", "preview");
+      const data = await apiForm<{ rows: ImportRowT[]; summary: ImportSummary }>("/api/users/import", form);
+      setImpRows(data.rows);
+      setImpSummary(data.summary);
+      setImpPhase("preview");
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setImpBusy(false);
+    }
+  }
+
+  async function commitImport() {
+    if (!impFile) return;
+    setImpBusy(true);
+    try {
+      const form = new FormData();
+      form.append("file", impFile);
+      form.append("mode", "commit");
+      form.append("role", impRole);
+      form.append("unit", impUnit);
+      form.append("jobTitle", impTitle);
+      form.append("resetPassword", impReset ? "1" : "0");
+      form.append("systemIds", JSON.stringify(impSystems));
+      const data = await apiForm<CommitResult>("/api/users/import", form);
+      setImpResult(data);
+      setImpPhase("done");
+      await load();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setImpBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto space-y-4">
@@ -325,19 +484,22 @@ export default function AdminUsersPage() {
             کاربران و مجوزها
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            افزودن، ویرایش کامل، تعلیق و حذف کاربران و تعیین دسترسی هر کاربر به هر سامانه
+            افزودن، ورود گروهی از فایل اکسل، ویرایش کامل، تعلیق و حذف کاربران — ورود با کد ملی / ایمیل
           </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
-              placeholder="جستجوی کاربر…"
+              placeholder="جستجوی نام، کد ملی، موبایل…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pr-9 w-44 md:w-56"
             />
           </div>
+          <Button variant="outline" onClick={openImport} className="gap-2">
+            <FileSpreadsheet className="size-4" /> ورود از فایل اکسل
+          </Button>
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" /> کاربر جدید
           </Button>
@@ -371,7 +533,7 @@ export default function AdminUsersPage() {
                       <div>
                         <p className="text-sm font-medium">{u.name}</p>
                         <p dir="ltr" className="text-[11px] text-muted-foreground text-right font-mono">
-                          {u.email}
+                          {u.username ? `${u.username} · ${u.email}` : u.email}
                         </p>
                       </div>
                     </div>
@@ -475,7 +637,7 @@ export default function AdminUsersPage() {
 
       {/* ویرایش کامل کاربر */}
       <Dialog open={editOpen} onOpenChange={(v) => { if (!v) { setEditOpen(false); setEditing(null); } }}>
-        <DialogContent className="sm:max-w-lg max-h-[88vh] overflow-y-auto" dir="rtl">
+        <DialogContent className="sm:max-w-2xl max-h-[88vh] overflow-y-auto" dir="rtl">
           {editing && (
             <>
               <DialogHeader>
@@ -538,6 +700,47 @@ export default function AdminUsersPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">مشخصات پرونده (مطابق فایل مشاورین)</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label>کد ملی (نام کاربری ورود)</Label>
+                      <Input dir="ltr" className="text-left" inputMode="numeric" value={eNid} onChange={(e) => setENid(e.target.value)} placeholder="۱۰ رقم" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>استان</Label>
+                      <Input value={eProvince} onChange={(e) => setEProvince(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>مدرک تحصیلی</Label>
+                      <Input value={eEdu} onChange={(e) => setEEdu(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>پروانه اشتغال</Label>
+                      <Input value={eLicense} onChange={(e) => setELicense(e.target.value)} placeholder="دارد / ندارد" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>رتبه حرفه‌ای</Label>
+                      <Input value={eRank} onChange={(e) => setERank(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>شماره قرارداد</Label>
+                      <Input dir="ltr" className="text-left" value={eContract} onChange={(e) => setEContract(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>کد استان</Label>
+                      <Input dir="ltr" className="text-left" value={eProvCode} onChange={(e) => setEProvCode(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>کد تفضیلی شخص</Label>
+                      <Input dir="ltr" className="text-left" value={ePersonal} onChange={(e) => setEPersonal(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>شماره شبا بانکی</Label>
+                      <Input dir="ltr" className="text-left" value={eSheba} onChange={(e) => setESheba(e.target.value)} />
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -644,8 +847,8 @@ export default function AdminUsersPage() {
                 <Input dir="ltr" className="text-left" type="text" value={fPass} onChange={(e) => setFPass(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>عنوان شغلی</Label>
-                <Input value={fTitle} onChange={(e) => setFTitle(e.target.value)} placeholder="مثلاً روان‌شناس" />
+                <Label>کد ملی (اختیاری — نام کاربری ورود)</Label>
+                <Input dir="ltr" className="text-left" inputMode="numeric" value={fNid} onChange={(e) => setFNid(e.target.value)} placeholder="۱۰ رقم" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -653,6 +856,12 @@ export default function AdminUsersPage() {
                 <Label>شماره تماس</Label>
                 <Input dir="ltr" className="text-left" value={fPhone} onChange={(e) => setFPhone(e.target.value)} placeholder="09xxxxxxxxx" />
               </div>
+              <div className="space-y-2">
+                <Label>عنوان شغلی</Label>
+                <Input value={fTitle} onChange={(e) => setFTitle(e.target.value)} placeholder="مثلاً روان‌شناس" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>نقش</Label>
                 <Select dir="rtl" value={fRole} onValueChange={setFRole}>
@@ -664,8 +873,6 @@ export default function AdminUsersPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>واحد سازمانی</Label>
                 <Select dir="rtl" value={fUnit} onValueChange={setFUnit}>
@@ -677,20 +884,20 @@ export default function AdminUsersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>رنگ آواتار</Label>
-                <div className="flex gap-2 h-9 items-center">
-                  {AVATAR_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setFColor(c)}
-                      className={`size-7 rounded-full transition-transform ${fColor === c ? "scale-110 ring-2 ring-offset-2 ring-foreground" : ""}`}
-                      style={{ backgroundColor: c }}
-                      aria-label={`رنگ ${c}`}
-                    />
-                  ))}
-                </div>
+            </div>
+            <div className="space-y-2">
+              <Label>رنگ آواتار</Label>
+              <div className="flex gap-2 h-9 items-center">
+                {AVATAR_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setFColor(c)}
+                    className={`size-7 rounded-full transition-transform ${fColor === c ? "scale-110 ring-2 ring-offset-2 ring-foreground" : ""}`}
+                    style={{ backgroundColor: c }}
+                    aria-label={`رنگ ${c}`}
+                  />
+                ))}
               </div>
             </div>
             <div className="space-y-2">
@@ -719,6 +926,231 @@ export default function AdminUsersPage() {
               {saving ? <Loader2 className="size-4 animate-spin" /> : "ایجاد کاربر"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ورود گروهی کاربران از فایل اکسل */}
+      <Dialog open={importOpen} onOpenChange={(v) => { if (!v) setImportOpen(false); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[88vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="size-5 text-primary" />
+              ورود گروهی کاربران از فایل اکسل
+            </DialogTitle>
+            <DialogDescription>
+              فایل اکسل مشاورین را دریافت و بررسی می‌کنیم؛ «کد ملی» نام کاربری ورود و «شماره تماس»
+              رمز عبور اولیه هر کاربر می‌شود. بقیه ستون‌ها در پروفایل کاربر ذخیره می‌شوند.
+            </DialogDescription>
+          </DialogHeader>
+
+          {impPhase === "pick" && (
+            <div className="space-y-4">
+              <a
+                href="/api/users/import"
+                className="flex items-center justify-between rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-3 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+                download
+              >
+                <span className="flex items-center gap-2">
+                  <Download className="size-4" />
+                  دانلود قالب استاندارد اکسل (همان ستون‌های فایل مشاورین)
+                </span>
+                <span className="text-xs opacity-70">xlsx</span>
+              </a>
+              <div className="space-y-2">
+                <Label>فایل اکسل دریافت‌شده از کاربر (xlsx / xls / csv)</Label>
+                <Input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={(e) => setImpFile(e.target.files?.[0] || null)}
+                  className="file:ml-2 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:text-primary"
+                />
+                <p className="text-xs text-muted-foreground leading-6">
+                  ستون‌های فایل: استان، نام و نام خانوادگی، مدرک تحصیلی، پروانه اشتغال، رتبه حرفه‌ای،
+                  شماره قرارداد، کد استان‌ها، کد تفضیلی شخص، شماره شباء بانکی، کد ملی، شماره تماس
+                </p>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label>نقش کاربران جدید</Label>
+                  <Select dir="rtl" value={impRole} onValueChange={setImpRole}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(ROLE_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>واحد سازمانی</Label>
+                  <Select dir="rtl" value={impUnit} onValueChange={setImpUnit}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {UNITS.map((un) => (
+                        <SelectItem key={un} value={un}>{un}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>عنوان شغلی</Label>
+                  <Input value={impTitle} onChange={(e) => setImpTitle(e.target.value)} />
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium">بازنشانی رمز عبور کاربران موجود به شماره تماس</p>
+                  <p className="text-xs text-muted-foreground">
+                    اگر کد ملی کسی از قبل در سیستم باشد، مشخصاتش بروزرسانی می‌شود
+                  </p>
+                </div>
+                <Switch checked={impReset} onCheckedChange={setImpReset} />
+              </div>
+              <div className="space-y-2">
+                <Label>دسترسی اولیه به سامانه‌ها (برای همه ردیف‌های فایل)</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {systems.map((s) => {
+                    const selected = impSystems.includes(s.id);
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() =>
+                          setImpSystems((cur) =>
+                            selected ? cur.filter((x) => x !== s.id) : [...cur, s.id]
+                          )
+                        }
+                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                          selected ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"
+                        }`}
+                      >
+                        {s.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <Button className="w-full" onClick={previewImport} disabled={!impFile || impBusy}>
+                {impBusy ? <Loader2 className="size-4 animate-spin" /> : "بررسی فایل و نمایش پیش‌نمایش"}
+              </Button>
+            </div>
+          )}
+
+          {impPhase === "preview" && impSummary && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-xl border p-3">
+                  <p className="text-lg font-bold" style={{ color: "#0f766e" }}>{faNum(impSummary.create)}</p>
+                  <p className="text-xs text-muted-foreground">ایجاد کاربر جدید</p>
+                </div>
+                <div className="rounded-xl border p-3">
+                  <p className="text-lg font-bold" style={{ color: "#d97706" }}>{faNum(impSummary.update)}</p>
+                  <p className="text-xs text-muted-foreground">بروزرسانی موجود</p>
+                </div>
+                <div className="rounded-xl border p-3">
+                  <p className="text-lg font-bold text-destructive">{faNum(impSummary.error)}</p>
+                  <p className="text-xs text-muted-foreground">خطا (ثبت نمی‌شوند)</p>
+                </div>
+              </div>
+              <div className="max-h-72 overflow-y-auto rounded-xl border">
+                <Table dir="rtl">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">سطر</TableHead>
+                      <TableHead className="text-xs">وضعیت</TableHead>
+                      <TableHead className="text-xs">نام</TableHead>
+                      <TableHead className="text-xs">کد ملی</TableHead>
+                      <TableHead className="text-xs">موبایل</TableHead>
+                      <TableHead className="text-xs">استان</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {impRows.map((r) => (
+                      <TableRow key={r.row} className={r.error ? "bg-destructive/5" : ""}>
+                        <TableCell className="text-xs text-muted-foreground">{faNum(r.row)}</TableCell>
+                        <TableCell>
+                          {r.error ? (
+                            <Badge variant="secondary" className="text-[10px] text-destructive">خطا</Badge>
+                          ) : r.action === "create" ? (
+                            <Badge variant="secondary" className="text-[10px]" style={{ color: "#0f766e" }}>ایجاد</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[10px]" style={{ color: "#d97706" }}>بروزرسانی</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <span className="inline-flex items-center gap-1">
+                            {r.name}
+                            {!r.nidValid && !r.error && (
+                              <AlertCircle className="size-3.5 text-amber-500" title="رقم کنترلی کد ملی معتبر نیست — بررسی کنید" />
+                            )}
+                          </span>
+                        </TableCell>
+                        <TableCell dir="ltr" className="text-[11px] font-mono text-left">{r.nationalId || "—"}</TableCell>
+                        <TableCell dir="ltr" className="text-[11px] font-mono text-left">{r.phone || "—"}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{r.province}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {impSummary.error > 0 && (
+                <div className="space-y-1 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive max-h-32 overflow-y-auto">
+                  {impRows
+                    .filter((r) => r.error)
+                    .map((r) => (
+                      <p key={r.row}>
+                        سطر {faNum(r.row)} — {r.name || "بدون نام"}: {r.error}
+                      </p>
+                    ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setImpPhase("pick")} disabled={impBusy}>
+                  بازگشت
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={commitImport}
+                  disabled={impBusy || impSummary.create + impSummary.update === 0}
+                >
+                  {impBusy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    `ثبت نهایی (${faNum(impSummary.create + impSummary.update)} کاربر)`
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {impPhase === "done" && impResult && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 rounded-xl border p-4 text-sm" style={{ borderColor: "#0f766e55", backgroundColor: "#0f766e0d", color: "#0f766e" }}>
+                <CheckCircle2 className="size-5 shrink-0" />
+                <span>
+                  {faNum(impResult.created)} کاربر جدید ایجاد و {faNum(impResult.updated)} کاربر بروزرسانی شد
+                  {impResult.failed.length > 0 ? ` — ${faNum(impResult.failed.length)} ردیف ناموفق` : "."}
+                </span>
+              </div>
+              {impResult.failed.length > 0 && (
+                <div className="space-y-1 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive max-h-40 overflow-y-auto">
+                  <p className="font-medium">ردیف‌های ناموفق:</p>
+                  {impResult.failed.map((f) => (
+                    <p key={f.row}>
+                      سطر {faNum(f.row)} — {f.name}: {f.reason}
+                    </p>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground leading-6">
+                نام کاربری ورود هر کاربر «کد ملی» و رمز عبور اولیه او «شماره تماس» ثبت‌شده در فایل است —
+                این اطلاعات را به کاربران اعلام کنید.
+              </p>
+              <Button className="w-full" onClick={() => setImportOpen(false)}>
+                پایان
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

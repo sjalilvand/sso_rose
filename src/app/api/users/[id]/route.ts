@@ -1,10 +1,22 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuth, hashPassword, audit, ApiError } from "@/lib/auth";
+import { requireAuth, hashPassword, audit, ApiError, normalizeIdentifier } from "@/lib/auth";
 import { apiError, json, readBody } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** کد ملی نرمال‌شده؛ رشتهٔ خالی یعنی پاک کردن نام کاربری */
+function normalizeNid(raw: string): string {
+  const nid = normalizeIdentifier(raw).replace(/[^0-9]/g, "");
+  if (!nid) return "";
+  return nid.length >= 8 && nid.length < 10 ? nid.padStart(10, "0") : nid;
+}
+
+/** شبا فقط رقم (حذف پیشوند IR و ارقام فارسی) */
+function normalizeSheba(raw: string): string {
+  return normalizeIdentifier(raw).replace(/[^0-9]/g, "");
+}
 
 /** ویرایش کامل کاربر (مشخصات، ایمیل، رمز، وضعیت، نقش و مجوزهای سامانه‌ها) */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -18,10 +30,19 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const body = await readBody<{
       name?: string;
       email?: string;
+      username?: string;
       role?: string;
       unit?: string;
       jobTitle?: string;
       phone?: string;
+      province?: string;
+      education?: string;
+      workLicense?: string;
+      profRank?: string;
+      contractNo?: string;
+      provinceCode?: string;
+      personalCode?: string;
+      bankSheba?: string;
       avatarColor?: string;
       status?: string;
       password?: string;
@@ -46,10 +67,33 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       }
     }
 
+    // تغییر کد ملی (نام کاربری) — فقط مدیر
+    if (body.username !== undefined) {
+      if (!isManager) throw new ApiError("تغییر کد ملی فقط توسط مدیر ممکن است", 403);
+      const nid = normalizeNid(body.username);
+      if (!nid) {
+        data.username = null;
+      } else if (!/^\d{10}$/.test(nid)) {
+        throw new ApiError("کد ملی باید ۱۰ رقم باشد", 400);
+      } else if (nid !== target.username) {
+        const dup = await db.user.findUnique({ where: { username: nid } });
+        if (dup) throw new ApiError("این کد ملی قبلاً برای کاربر دیگری ثبت شده است", 409);
+        data.username = nid;
+      }
+    }
+
     if (body.role && isManager) data.role = body.role;
     if (body.unit) data.unit = body.unit;
     if (body.jobTitle !== undefined) data.jobTitle = body.jobTitle;
     if (body.phone !== undefined) data.phone = body.phone;
+    if (body.province !== undefined) data.province = body.province;
+    if (body.education !== undefined) data.education = body.education;
+    if (body.workLicense !== undefined) data.workLicense = body.workLicense;
+    if (body.profRank !== undefined) data.profRank = body.profRank;
+    if (body.contractNo !== undefined) data.contractNo = body.contractNo;
+    if (body.provinceCode !== undefined) data.provinceCode = body.provinceCode;
+    if (body.personalCode !== undefined) data.personalCode = body.personalCode;
+    if (body.bankSheba !== undefined) data.bankSheba = normalizeSheba(body.bankSheba);
     if (body.avatarColor) data.avatarColor = body.avatarColor;
     if (body.status && isManager) {
       if (id === me.id && body.status !== "ACTIVE")
@@ -80,7 +124,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       userName: me.name,
       action: "ویرایش کاربر",
       entity: "user",
-      details: `${data.name || target.name}${data.email ? ` — ایمیل جدید: ${data.email}` : ""}`,
+      details: `${data.name || target.name}${data.email ? ` — ایمیل جدید: ${data.email}` : ""}${data.username ? ` — کد ملی: ${data.username}` : ""}`,
     });
     return json({ ok: true });
   } catch (e) {

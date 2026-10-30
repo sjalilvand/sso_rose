@@ -42,6 +42,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       email: user.email,
       name: user.name,
       role: user.role,
+      username: user.username,
       systemId: system.id,
       systemName: system.name,
       clientId: creds.clientId,

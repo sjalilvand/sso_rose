@@ -27,12 +27,21 @@ enum UserStatus {
 model User {
   id               String     @id @default(cuid())
   email            String     @unique
+  username         String?    @unique // کد ملی — نام کاربری جایگزین ایمیل برای ورود
   passwordHash     String
   name             String
   role             UserRole   @default(STAFF)
   unit             String     @default("عمومی") // واحد سازمانی
   jobTitle         String     @default("")
   phone            String     @default("")
+  province         String     @default("") // استان
+  education        String     @default("") // مدرک تحصیلی
+  workLicense      String     @default("") // پروانه اشتغال (دارد / ندارد)
+  profRank         String     @default("") // رتبه حرفه‌ای
+  contractNo       String     @default("") // شماره قرارداد
+  provinceCode     String     @default("") // کد استان‌ها
+  personalCode     String     @default("") // کد تفضیلی شخص
+  bankSheba        String     @default("") // شماره شبا بانکی
   avatarColor      String     @default("#c2185b")
   status           UserStatus @default(ACTIVE)
   twoFactorEnabled Boolean    @default(false)
