@@ -1,8 +1,8 @@
 # =============================================================================
 #  update-rosehub.ps1 - Update Rose Hub on the server from GitHub
-#  Steps: stop app + backup database + git sync (DB restored after reset)
-#         + npm install + prisma + sync system names/urls + build
-#         + PM2 start + health check
+#  Steps: stop app (PM2 / port owner) + backup database + git sync
+#         (DB restored after reset) + npm install + prisma
+#         + sync system names/urls + build + PM2 start + health check
 #  Usage:
 #     powershell -ExecutionPolicy Bypass -File C:\update-rosehub.ps1
 #  Optional parameters:
@@ -13,10 +13,15 @@
 #          UTF-8 scripts without BOM on some system locales, which breaks
 #          Persian string literals. Keep this file ASCII-only.
 #  NOTE 2: the SQLite database (db\custom.db) and .env are never taken from
-#          git. The app is stopped before git reset (releases file locks -
-#          this is what made "git reset failed" happen before), the database
-#          is backed up to the temp folder and restored right after the
-#          reset, so server data always survives the update.
+#          git. The database is backed up before git reset and restored
+#          right after it, so server data always survives the update.
+#  NOTE 3: the app must be fully stopped before "prisma generate", otherwise
+#          Windows refuses to replace the locked query engine DLL
+#          (EPERM rename error). The stop routine works even when the app
+#          is not visible in the current user's PM2 list: it stops any PM2
+#          app living in the install folder, then kills whatever still
+#          listens on the app port, then kills the PM2 daemon / node.exe
+#          if something keeps respawning it.
 # =============================================================================
 
 #requires -Version 5.1
@@ -41,6 +46,40 @@ function Refresh-Path {
 }
 Refresh-Path
 
+# ---------- port helpers ----------
+function Get-PortPids([int]$P) {
+    $pids = @()
+    try {
+        $conns = Get-NetTCPConnection -LocalPort $P -State Listen -ErrorAction Stop
+        $pids  = @($conns | ForEach-Object { $_.OwningProcess } | Select-Object -Unique)
+    } catch {
+        # fallback for systems without Get-NetTCPConnection
+        $lines = netstat -ano | Select-String ":$P\s" | Select-String "LISTENING"
+        foreach ($line in $lines) {
+            $parts = ($line.ToString().Trim() -split "\s+")
+            if ($parts.Length -ge 5) { $pids += [int]$parts[-1] }
+        }
+        $pids = @($pids | Select-Object -Unique)
+    }
+    return $pids
+}
+
+function Stop-PortOwners([int]$P) {
+    foreach ($procId in (Get-PortPids $P)) {
+        try {
+            $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
+            if ($proc) {
+                Write-Warn2 "Port $P is held by PID $procId ($($proc.ProcessName)) - killing it"
+                Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+            }
+        } catch {}
+    }
+}
+
+function Test-PortBusy([int]$P) {
+    return (Get-PortPids $P).Count -gt 0
+}
+
 # ---------- Step 1/9: check install folder ----------
 Write-Step "Step 1/9 - Check install folder"
 if (-not (Test-Path (Join-Path $InstallDir "package.json"))) {
@@ -49,19 +88,53 @@ if (-not (Test-Path (Join-Path $InstallDir "package.json"))) {
 Set-Location $InstallDir
 Write-Ok "Install folder: $InstallDir"
 
-# ---------- Step 2/9: stop the app (release file locks) ----------
-Write-Step "Step 2/9 - Stop the app (PM2)"
+# ---------- Step 2/9: stop the app (PM2 + port + respawn guard) ----------
+Write-Step "Step 2/9 - Stop the app"
 $pm2Name = "rose-hub"
 $inList  = $false
-try {
-    $jl = pm2 jlist 2>$null | ConvertFrom-Json
-    if ($jl) { $inList = ($jl | Where-Object { $_.name -eq $pm2Name }) -ne $null }
-} catch {}
-if ($inList) {
-    pm2 stop $pm2Name 2>$null | Out-Null
-    Write-Ok "PM2: $pm2Name stopped (file locks released)"
+
+# 2a) stop any PM2 app that lives in the install folder (any name)
+$pm2Apps = @()
+try { $pm2Apps = @(pm2 jlist 2>$null | ConvertFrom-Json) } catch {}
+foreach ($app in $pm2Apps) {
+    $cwd = ""
+    try { $cwd = [string]$app.pm2_env.pm_cwd } catch {}
+    $appName = [string]$app.name
+    if ($appName -eq $pm2Name -or ($cwd -and $cwd.ToLower().StartsWith($InstallDir.ToLower()))) {
+        pm2 stop $appName 2>$null | Out-Null
+        Write-Ok "PM2: stopped app '$appName'"
+        $inList = $true
+    }
+}
+if (-not $inList) {
+    Write-Warn2 "No PM2 app found for this folder in the current user's PM2 list"
+}
+
+Start-Sleep -Seconds 2
+
+# 2b) whatever still listens on the app port IS the app - kill it
+if (Test-PortBusy $Port) {
+    Stop-PortOwners $Port
+    Start-Sleep -Seconds 3
+    # 2c) if it came back, a supervisor respawns it - kill the supervisor too
+    if (Test-PortBusy $Port) {
+        Write-Warn2 "App came back after kill - stopping PM2 daemon and node processes"
+        pm2 kill 2>$null | Out-Null
+        Stop-PortOwners $Port
+        Start-Sleep -Seconds 2
+    }
+    if (Test-PortBusy $Port) {
+        Write-Warn2 "Still respawning - killing all node.exe processes (Rose Hub is the only Node app on this server)"
+        taskkill /F /IM node.exe 2>$null | Out-Null
+        Start-Sleep -Seconds 2
+        Stop-PortOwners $Port
+    }
+}
+
+if (Test-PortBusy $Port) {
+    Write-Warn2 "Port $Port is STILL busy - prisma/build steps may fail on locked files"
 } else {
-    Write-Warn2 "PM2 process '$pm2Name' not found - continuing"
+    Write-Ok "App stopped, port $Port is free"
 }
 
 # ---------- Step 3/9: backup database ----------
@@ -124,7 +197,7 @@ Write-Ok "Dependencies installed"
 # ---------- Step 6/9: Prisma (client + schema sync) ----------
 Write-Step "Step 6/9 - Prisma (generate + db push)"
 npx prisma generate
-if ($LASTEXITCODE -ne 0) { throw "prisma generate failed" }
+if ($LASTEXITCODE -ne 0) { throw "prisma generate failed - is the app really stopped? Re-run this script." }
 npx prisma db push --accept-data-loss --skip-generate
 if ($LASTEXITCODE -ne 0) { Write-Warn2 "prisma db push failed - harmless if the schema did not change" }
 Write-Ok "Prisma ready (username + consultant fields present)"
@@ -150,11 +223,13 @@ Write-Ok "Build completed (.next)"
 
 # ---------- Step 9/9: start PM2 and health check ----------
 Write-Step "Step 9/9 - Start app (PM2)"
-if ($inList) {
-    pm2 restart $pm2Name --update-env 2>$null | Out-Null
+if (Test-PortBusy $Port) {
+    Write-Warn2 "Something already listens on port $Port - skipping PM2 start (app probably managed by another PM2 session)"
+} elseif ($inList) {
+    pm2 restart $pm2Name --update-env
     Write-Ok "PM2: $pm2Name restarted"
 } else {
-    pm2 start ecosystem.config.js 2>$null | Out-Null
+    pm2 start ecosystem.config.js
     pm2 save 2>$null | Out-Null
     Write-Ok "PM2: app started from ecosystem.config.js"
 }
@@ -181,7 +256,7 @@ if ($healthy) {
     Write-Host "    - Login with national ID (code melli) or email"
     Write-Host "    - Consultant profile fields (province, education, license,"
     Write-Host "      rank, contract no, personal code, bank sheba) stored"
-    Write-Host "    - Update script now stops the app and backs up the database"
+    Write-Host "    - Update script: safe stop + database backup/restore"
     Write-Host "  Tip: press Ctrl+F5 in the browser to bypass the cache."
     Write-Host "================================================================="
 } else {
