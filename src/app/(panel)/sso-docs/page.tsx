@@ -370,6 +370,7 @@ export default function SsoDocsPage() {
               {[
                 ["POST /api/systems/{id}/sso", "ورود کاربر در رز هاب", "صدور توکن و launchUrl (داخل رز هاب استفاده می‌شود)"],
                 ["GET /api/sso/config", "عمومی", "پیکربندی SSO، زمان سرور و پارامترهای اعتبارسنجی"],
+                ["GET /api/sso/launch?clientId=...", "عمومی (نیازمند نشست)", "شروع ورود یکپارچه از سمت سامانه مقصد — 302 به سامانه با sso_token؛ بدون نشست، به صفحه ورود با next برمی‌گردد"],
                 ["GET /api/auth/logout?redirect=/login", "عمومی", "خروج یکپارچه — لغو نشست رز هاب"],
               ].map(([a, b, c]) => (
                 <tr key={a} className="border-b last:border-0">

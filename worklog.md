@@ -89,3 +89,21 @@ Work Log:
 
 Stage Summary:
 - نصب روی سرور حالا با یک دستور irm از raw GitHub ممکن است؛ نیازی به انتقال دستی فایل نیست
+
+---
+Task ID: 7
+Agent: main (Z.ai)
+Task: اتصال ۳ سامانه واقعی به SSO رز هاب (special-spoon، rosecenter، rose-attendance)
+
+Work Log:
+- توکن جدید تأیید شد؛ ۳ مخزن کلون شد: special-spoon=Rosepsy (FastAPI+React)، rosecenter (Flask+SQLite)، rose-attendance (Django+PWA)
+- نگاشت: رز سای→rose-psy-5c3f9b، رز سنتر→rose-center-2e8a5c، تکنورز→rose-techno-8a4e1f
+- rosecenter: مسیر /sso/rose (اعتبارسنجی JWT با PyJWT، ساخت خودکار حساب، نشست Flask) + دکمه در login.html + تست سرتاسری موفق (بدون توکن→رز هاب، توکن معتبر→پنل، توکن خراب→رد)
+- special-spoon: router rose_sso.py (GET ریدایرکتی + POST JSON، ساخت AuthSession و refresh cookie هم‌شکل لاگین) + اسکریپت بوت index.html + دکمه LoginPage + تنظیمات config
+- rose-attendance: RoseSSOView در people (صدور جفت‌توکن SimpleJWT) + مسیر auth/rose-sso/ + اسکریپت بوت index.html با کلیدهای rose.access/rose.refresh + دکمه LoginPage
+- رز هاب: endpoint جدید GET /api/sso/launch?clientId= (SP-initiated؛ بدون نشست→login با next) + PUBLIC_PATHS + اسکریپت bind-sso-systems.cjs برای اتصال URL سامانه‌ها به آدرس سرور + ردیف مستندات sso-docs
+- تست سندباکس: build موفق؛ launch بدون نشست→307 به login?next؛ با نشست→302 به سامانه با sso_token؛ توکن با secret سامانه معتبر (299s) و با secret غلط رد شد
+
+Stage Summary:
+- جریان کامل «یک یوزر و پسورد»: ورود رز هاب → کلیک/دکمه در هر سامانه → ورود خودکار
+- پس از پوش، روی سرور: به‌روزرسانی رز هاب + اجرای bind-sso-systems.cjs + به‌روزرسانی ۳ سامانه

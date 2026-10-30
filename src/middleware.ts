@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth-edge";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/otp", "/api/health", "/api/sso/config"];
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/otp", "/api/health", "/api/sso/config", "/api/sso/launch"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
