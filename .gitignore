@@ -65,3 +65,6 @@ db/custom-backup-*.db*
 
 # Local clones of integrated systems (separate repos)
 /integrations/
+
+# Uploaded personal-data files (consultant lists etc.) - never commit
+/upload/
