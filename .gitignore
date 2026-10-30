@@ -62,3 +62,6 @@ server.log
 /db/*.db-shm
 /db/*.db-journal
 db/custom-backup-*.db*
+
+# Local clones of integrated systems (separate repos)
+/integrations/
