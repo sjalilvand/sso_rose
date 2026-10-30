@@ -70,7 +70,7 @@
 # نصب وابستگی‌ها
 npm install
 
-# ایجاد پایگاه داده (یا کپی از deploy/db-template/custom.db — دیتابیس نمونه آماده دارد)
+# ایجاد پایگاه داده (فایل db/custom.db آماده و seed شده در ریپو موجود است)
 npm run db:push
 
 # اجرای سرور توسعه
@@ -79,26 +79,24 @@ npm run dev
 
 سپس `http://localhost:3000` را باز کنید.
 
-### استقرار روی ویندوز سرور (Production — بدون داکر)
+### استقرار روی ویندوز سرور (Production — پورت 8082)
 
-برای نصب کامل روی Windows Server با پورت **8088 (فرانت)** و **3008 (بک‌اند)**،
-سرویس ویندوزی با شروع خودکار، نصب خودکار Node.js و بدون نیاز به داکر، پوشه
-**`deploy/`** را ببینید: [`deploy/README-deploy.md`](deploy/README-deploy.md)
+برای نصب کامل روی Windows Server با پورت **8082**، اجرای دائمی با PM2،
+نصب خودکار Node.js/Git، باز کردن فایروال و به‌روزرسانی با پشتیبان‌گیری دیتابیس:
 
 ```powershell
-# اجرای یک‌خطی روی سرور (PowerShell با دسترسی Administrator):
+# روی سرور (PowerShell با دسترسی Administrator):
 [Net.ServicePointManager]::SecurityProtocol='Tls12'
-irm https://raw.githubusercontent.com/sjalilvand/sso_rose/main/deploy/bootstrap.ps1 -OutFile "$env:TEMP\rose-hub-bootstrap.ps1"
-powershell -ExecutionPolicy Bypass -File "$env:TEMP\rose-hub-bootstrap.ps1"
+irm https://raw.githubusercontent.com/sjalilvand/sso_rose/main/deploy-rose-hub.ps1 -OutFile "$env:TEMP\deploy-rose-hub.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:TEMP\deploy-rose-hub.ps1"
 ```
 
-مدیریت روزانه: `deploy\update.ps1` (به‌روزرسانی از گیت)، `deploy\status.ps1`،
-`deploy\start.ps1` / `stop.ps1` / `restart.ps1`، `deploy\logs.ps1 -Follow`.
+راهنمای کامل: [`docs/deploy-8082-fa.md`](docs/deploy-8082-fa.md) — مدیریت روزانه با دستورات `pm2 status`، `pm2 logs rose-hub`، `pm2 restart rose-hub`.
 
 ### متغیرهای محیطی
 
 ```
-DATABASE_URL=file:./db/custom.db
+DATABASE_URL=file:../db/custom.db
 AUTH_SECRET=<یک رشته تصادفی بلند برای امضای توکن‌ها>
 ```
 

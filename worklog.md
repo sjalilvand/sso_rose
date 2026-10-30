@@ -40,3 +40,37 @@ Stage Summary:
 - اجرای محلی ویندوز: کلون → npm install → npx prisma generate → npm run dev → http://localhost:3000 (admin@rose.ir / rose1234)
 - دیتابیس seed شده (db/custom.db) داخل ریپو است؛ نیازی به db push/seed نیست
 - تحویل‌شده: download/setup-rose-hub.ps1 برای نصب خودکار روی ویندوز
+
+---
+Task ID: 4
+Agent: main (Z.ai)
+Task: پوش به‌روزرسانی‌های SSO (مستندات + لینک‌ها) به GitHub با توکن جدید کاربر
+
+Work Log:
+- بررسی وضعیت: کامیت dd4d8a4 (کیت یکپارچه‌سازی SSO) و کامیت‌های بعدی به‌صورت محلی موجود بودند اما پوش نشده بودند (origin/main عقب‌تر)
+- پاکسازی آرتیفکت‌های نامرتبطِ کامیت خودکار a459ff7: حذف tool-results/، .zscripts/، scripts/gen-doc-*.js و وابستگی بلااستفاده docx از package.json + به‌روزرسانی .gitignore (کامیت 1fb2676)
+- به‌روزرسانی remote URL با توکن جدید و push موفق: a1bd3c0..1fb2676 → origin/main
+- تأیید سلامت: /login=200، /api/sso/config عمومی=200 (issuer/algorithm/claims/TTL)، /sso-docs=200، /api/systems با URLهای واقعی و clientId/clientSecret اختصاصی هر ۵ سامانه
+
+Stage Summary:
+- github.com/sjalilvand/sso_rose به‌روز است (origin/main = 1fb2676)
+- محتوای پوش‌شده: docs/sso-integration-fa.md (راهنمای کامل فارسی)، صفحه /sso-docs داخل برنامه، اعتبارنامه اختصاصی هر سامانه، لینک مستقیم ۵ سامانه در کارت‌ها
+
+---
+Task ID: 5
+Agent: main (Z.ai)
+Task: استقرار رز هاب روی سرور ویندوزی کاربر (130.185.73.157) روی پورت 8082
+
+Work Log:
+- تحلیل جدول پورت‌های سرور: 8082 آزاد است؛ سرور ویندوزی با Caddy(80)/Nginx(8085)/RDP/PostgreSQL/Redis
+- تست کامل مسیر production در سندباکس: next build موفق، PM2 + ecosystem.config.js با next start -p 8082، ورود admin و کوئری‌های Prisma روی دیتابیس نسبی همه 200
+- کشف و رفع باگ بحرانی: .env روی GitHub به مسیر مطلق لینوکسی برگشته بود → اصلاح به file:../db/custom.db
+- نوشتن deploy-rose-hub.ps1 (UTF-8 BOM): نصب خودکار Node 20.9+/Git، کلون/به‌روزرسانی هوشمند، پشتیبان‌گیری دیتابیس قبل از update و بازگردانی، next build، فایروال، PM2 + pm2-startup، health-check
+- نوشتن docs/deploy-8082-fa.md (راهنمای فارسی نصب/به‌روزرسانی/عیب‌یابی/اتصال دامنه با Caddy)
+- کشف دو کامیت موازی روی ریموت (کیت استقرار قدیمی 8088/3008) → merge و جایگزینی با استقرار مرجع 8082 (حذف deploy/، بازگردانی db/custom.db که در مرج حذف شده بود، به‌روزرسانی README)
+- حذف توکن باطل از اسکریپت (ریپو عمومی؛ بدون توکن کلون می‌شود)
+- تلاش پوش ناموفق: توکن ghp_mXbER... باطل است و توکن جدید در پیام کاربر نیامده → کامیت‌ها محلی آماده‌اند (fc1a9bc)
+
+Stage Summary:
+- استقرار 8082 کاملاً آماده و تست‌شده؛ اسکریپت + راهنما در download/ تحویل شد
+- انتظار: توکن معتبر جدید برای پوش نهایی (۴ کامیت محلی جلوتر از origin/main)

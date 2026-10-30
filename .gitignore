@@ -57,14 +57,8 @@ server.log
 /tool-results/
 /scripts/gen-doc-*
 
-# ---- Deployment (Rose Hub) ----
-# دیتابیس زنده runtime هرگز کامیت نمی‌شود؛ تمپلیت آن در deploy/db-template نگه‌داری می‌شود
-/db/*.db
-/db/*.db-journal
+# Database runtime sidecar files (never commit) + update backups
 /db/*.db-wal
 /db/*.db-shm
-
-# اطلاعات محرمانه سرور (هرگز push نشود)
-deploy/github-token.txt
-deploy/local-config.ps1
-
+/db/*.db-journal
+db/custom-backup-*.db*
