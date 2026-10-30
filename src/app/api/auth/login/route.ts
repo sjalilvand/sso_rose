@@ -72,10 +72,14 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json({
       user: { id: user.id, name: user.name, role: user.role },
     });
+    // کوکی نشست: فقط روی HTTPS فلگ Secure می‌گیرد تا ورود روی HTTP (IP:پورت) هم کار کند.
+    // پشت ریورس‌پروکسی (مثل Caddy)، از x-forwarded-proto استفاده می‌شود.
+    const forwardedProto = req.headers.get("x-forwarded-proto");
+    const isHttps = (forwardedProto || req.nextUrl.protocol.replace(":", "")) === "https";
     res.cookies.set("rose_hub_session", token, {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: isHttps,
       maxAge: 7 * 24 * 60 * 60,
       path: "/",
     });
