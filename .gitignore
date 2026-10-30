@@ -68,3 +68,6 @@ db/custom-backup-*.db*
 
 # Uploaded personal-data files (consultant lists etc.) - never commit
 /upload/
+
+# Runtime SQLite database (never commit - production data lives on the server)
+/db/*.db
