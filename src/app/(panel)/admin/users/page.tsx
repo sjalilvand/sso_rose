@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/client";
 import { SystemIcon } from "@/components/panel/system-icon";
 import { ROLE_LABELS, ROLE_COLORS, UNITS } from "@/lib/permissions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +19,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -38,6 +48,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -46,11 +57,12 @@ import {
   MoreHorizontal,
   ShieldCheck,
   ShieldOff,
-  UserX,
+  Pencil,
   KeyRound,
   Loader2,
   Search,
-  Grid2X2,
+  Trash2,
+  UserX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatShortJalali, faNum } from "@/lib/jalali";
@@ -83,24 +95,47 @@ interface Sys {
 
 const AVATAR_COLORS = ["#9c27b0", "#0f766e", "#c2185b", "#d97706", "#0369a1", "#7c3aed", "#6366f1", "#dc2626"];
 
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "فعال",
+  SUSPENDED: "معلق",
+  INACTIVE: "غیرفعال",
+};
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<U[]>([]);
   const [systems, setSystems] = useState<Sys[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [editUser, setEditUser] = useState<U | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // فرم کاربر جدید
+  // دیالوگ ویرایش کامل
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<U | null>(null);
+  const [eName, setEName] = useState("");
+  const [eEmail, setEEmail] = useState("");
+  const [ePhone, setEPhone] = useState("");
+  const [eTitle, setETitle] = useState("");
+  const [eRole, setERole] = useState("STAFF");
+  const [eUnit, setEUnit] = useState("پذیرش");
+  const [eStatus, setEStatus] = useState("ACTIVE");
+  const [eColor, setEColor] = useState(AVATAR_COLORS[2]);
+  const [ePass, setEPass] = useState("");
+  const [eSystems, setESystems] = useState<string[]>([]);
+
+  // دیالوگ کاربر جدید
+  const [createOpen, setCreateOpen] = useState(false);
   const [fName, setFName] = useState("");
   const [fEmail, setFEmail] = useState("");
   const [fPass, setFPass] = useState("");
   const [fRole, setFRole] = useState("STAFF");
   const [fUnit, setFUnit] = useState("پذیرش");
   const [fTitle, setFTitle] = useState("");
+  const [fPhone, setFPhone] = useState("");
   const [fColor, setFColor] = useState(AVATAR_COLORS[2]);
   const [fSystems, setFSystems] = useState<string[]>([]);
+
+  // تأیید حذف کامل
+  const [deleteTarget, setDeleteTarget] = useState<U | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -133,6 +168,7 @@ export default function AdminUsersPage() {
     [users, search]
   );
 
+  // ---------- ایجاد ----------
   async function createUser() {
     if (!fName.trim() || !fEmail.trim() || fPass.length < 8) {
       toast.error("نام، ایمیل و رمز عبور (حداقل ۸ نویسه) الزامی است");
@@ -149,16 +185,18 @@ export default function AdminUsersPage() {
           role: fRole,
           unit: fUnit,
           jobTitle: fTitle,
+          phone: fPhone,
           avatarColor: fColor,
           systemIds: fSystems,
         },
       });
-      toast.success("کاربر ایجاد شد");
+      toast.success("کاربر جدید ایجاد شد");
       setCreateOpen(false);
       setFName("");
       setFEmail("");
       setFPass("");
       setFTitle("");
+      setFPhone("");
       setFSystems([]);
       await load();
     } catch (err) {
@@ -168,22 +206,66 @@ export default function AdminUsersPage() {
     }
   }
 
+  // ---------- ویرایش کامل ----------
+  function openEdit(u: U) {
+    setEditing(u);
+    setEName(u.name);
+    setEEmail(u.email);
+    setEPhone(u.phone || "");
+    setETitle(u.jobTitle || "");
+    setERole(u.role);
+    setEUnit(u.unit || "عمومی");
+    setEStatus(u.status);
+    setEColor(u.avatarColor || AVATAR_COLORS[2]);
+    setEPass("");
+    setESystems(u.systemIds || []);
+    setEditOpen(true);
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    if (!eName.trim() || !eEmail.trim()) {
+      toast.error("نام و ایمیل الزامی است");
+      return;
+    }
+    if (ePass && ePass.length < 8) {
+      toast.error("رمز عبور باید حداقل ۸ نویسه باشد");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api(`/api/users/${editing.id}`, {
+        method: "PATCH",
+        body: {
+          name: eName,
+          email: eEmail,
+          phone: ePhone,
+          jobTitle: eTitle,
+          role: eRole,
+          unit: eUnit,
+          status: eStatus,
+          avatarColor: eColor,
+          systemIds: eSystems,
+          ...(ePass ? { password: ePass } : {}),
+        },
+      });
+      toast.success("تغییرات کاربر ذخیره شد");
+      setEditOpen(false);
+      setEditing(null);
+      await load();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ---------- سایر عملیات ----------
   async function toggleStatus(u: U) {
     const next = u.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
     try {
       await api(`/api/users/${u.id}`, { method: "PATCH", body: { status: next } });
       toast.success(next === "ACTIVE" ? "حساب فعال شد" : "حساب به حالت تعلیق درآمد");
-      await load();
-    } catch (err) {
-      toast.error((err as Error).message);
-    }
-  }
-
-  async function saveAccess(u: U, systemIds: string[]) {
-    try {
-      await api(`/api/users/${u.id}`, { method: "PATCH", body: { systemIds } });
-      toast.success("مجوزهای سامانه به‌روزرسانی شد");
-      setEditUser(null);
       await load();
     } catch (err) {
       toast.error((err as Error).message);
@@ -197,6 +279,31 @@ export default function AdminUsersPage() {
       toast.success(`رمز جدید: ${newPass} — به کاربر اعلام کنید`, { duration: 10000 });
     } catch (err) {
       toast.error((err as Error).message);
+    }
+  }
+
+  async function deactivate(u: U) {
+    try {
+      await api(`/api/users/${u.id}`, { method: "DELETE" });
+      toast.success("کاربر غیرفعال شد (سوابق حفظ شد)");
+      await load();
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
+  async function hardDelete() {
+    if (!deleteTarget) return;
+    setSaving(true);
+    try {
+      await api(`/api/users/${deleteTarget.id}?hard=1`, { method: "DELETE" });
+      toast.success(`کاربر «${deleteTarget.name}» به‌طور کامل حذف شد`);
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -218,7 +325,7 @@ export default function AdminUsersPage() {
             کاربران و مجوزها
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            تعریف، ویرایش، تعلیق کاربران و تعیین دسترسی هر کاربر به هر سامانه
+            افزودن، ویرایش کامل، تعلیق و حذف کاربران و تعیین دسترسی هر کاربر به هر سامانه
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -277,9 +384,9 @@ export default function AdminUsersPage() {
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
                     <button
-                      onClick={() => setEditUser(u)}
+                      onClick={() => openEdit(u)}
                       className="flex items-center gap-1 hover:opacity-80"
-                      title="ویرایش دسترسی‌ها"
+                      title="ویرایش کاربر و دسترسی‌ها"
                     >
                       {systems.map((s) => {
                         const has = u.systemIds?.includes(s.id);
@@ -307,7 +414,7 @@ export default function AdminUsersPage() {
                           u.status === "ACTIVE" ? "#e0f2f1" : u.status === "SUSPENDED" ? "#fee2e2" : "#f1f5f9",
                       }}
                     >
-                      {u.status === "ACTIVE" ? "فعال" : u.status === "SUSPENDED" ? "معلق" : "غیرفعال"}
+                      {STATUS_LABELS[u.status] || u.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
@@ -320,103 +427,198 @@ export default function AdminUsersPage() {
                           <MoreHorizontal className="size-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditUser(u)} className="cursor-pointer">
-                          <Grid2X2 className="size-4 ms-0 me-2" /> مجوزهای سامانه‌ها
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={() => openEdit(u)} className="cursor-pointer">
+                          <Pencil className="size-4 ms-0 me-2" /> ویرایش کامل کاربر
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => resetPassword(u)} className="cursor-pointer">
                           <KeyRound className="size-4 ms-0 me-2" /> بازنشانی رمز عبور
                         </DropdownMenuItem>
-                        {u.status !== "INACTIVE" && (
-                          <DropdownMenuItem
-                            onClick={() => toggleStatus(u)}
-                            className="cursor-pointer"
-                          >
-                            {u.status === "ACTIVE" ? (
-                              <>
-                                <ShieldOff className="size-4 ms-0 me-2" /> تعلیق حساب
-                              </>
-                            ) : (
-                              <>
-                                <ShieldCheck className="size-4 ms-0 me-2" /> فعال‌سازی حساب
-                              </>
-                            )}
+                        <DropdownMenuSeparator />
+                        {u.status === "ACTIVE" ? (
+                          <DropdownMenuItem onClick={() => toggleStatus(u)} className="cursor-pointer">
+                            <ShieldOff className="size-4 ms-0 me-2" /> تعلیق حساب
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => toggleStatus(u)} className="cursor-pointer">
+                            <ShieldCheck className="size-4 ms-0 me-2" /> فعال‌سازی حساب
                           </DropdownMenuItem>
                         )}
                         {u.status !== "INACTIVE" && (
-                          <DropdownMenuItem
-                            onClick={async () => {
-                              try {
-                                await api(`/api/users/${u.id}`, { method: "DELETE" });
-                                toast.success("کاربر غیرفعال شد");
-                                await load();
-                              } catch (err) {
-                                toast.error((err as Error).message);
-                              }
-                            }}
-                            className="cursor-pointer text-destructive focus:text-destructive"
-                          >
-                            <UserX className="size-4 ms-0 me-2" /> غیرفعال‌سازی
+                          <DropdownMenuItem onClick={() => deactivate(u)} className="cursor-pointer">
+                            <UserX className="size-4 ms-0 me-2" /> غیرفعال‌سازی (حفظ سوابق)
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setDeleteTarget(u)}
+                          className="cursor-pointer text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="size-4 ms-0 me-2" /> حذف کامل کاربر
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">
+                    کاربری با این مشخصات یافت نشد.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      {/* مجوزهای سامانه‌ها */}
-      <Dialog open={!!editUser} onOpenChange={(v) => !v && setEditUser(null)}>
-        <DialogContent className="sm:max-w-md" dir="rtl">
-          {editUser && (
+      {/* ویرایش کامل کاربر */}
+      <Dialog open={editOpen} onOpenChange={(v) => { if (!v) { setEditOpen(false); setEditing(null); } }}>
+        <DialogContent className="sm:max-w-lg max-h-[88vh] overflow-y-auto" dir="rtl">
+          {editing && (
             <>
               <DialogHeader>
-                <DialogTitle>دسترسی {editUser.name} به سامانه‌ها</DialogTitle>
+                <DialogTitle>ویرایش کامل کاربر</DialogTitle>
                 <DialogDescription>
-                  اصل مهم: یک‌بار ورود به معنای دسترسی به همه سایت‌ها نیست؛ مجوز هر سامانه جداگانه تعیین می‌شود.
+                  همهٔ مشخصات، رمز عبور، وضعیت و مجوز سامانه‌های کاربر از همین‌جا قابل تغییر است.
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-2">
-                {systems.map((s) => {
-                  const has = editUser.systemIds?.includes(s.id) || false;
-                  return (
-                    <div key={s.id} className="flex items-center gap-3 rounded-xl border px-3 py-2.5">
-                      <SystemIcon name={s.icon} color={s.color} className="size-8" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{s.name}</p>
-                        <p dir="ltr" className="text-[10px] text-muted-foreground text-right font-mono">
-                          {s.url.replace(/^https?:\/\//, "")}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={has}
-                        onCheckedChange={(v) => {
-                          const cur = editUser.systemIds || [];
-                          setEditUser({
-                            ...editUser,
-                            systemIds: v ? [...cur, s.id] : cur.filter((x) => x !== s.id),
-                          });
-                        }}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>نام و نام خانوادگی</Label>
+                    <Input value={eName} onChange={(e) => setEName(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>ایمیل (نام کاربری ورود)</Label>
+                    <Input dir="ltr" className="text-left" type="email" value={eEmail} onChange={(e) => setEEmail(e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>شماره تماس</Label>
+                    <Input dir="ltr" className="text-left" value={ePhone} onChange={(e) => setEPhone(e.target.value)} placeholder="09xxxxxxxxx" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>عنوان شغلی</Label>
+                    <Input value={eTitle} onChange={(e) => setETitle(e.target.value)} placeholder="مثلاً روان‌شناس" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label>نقش</Label>
+                    <Select dir="rtl" value={eRole} onValueChange={setERole}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(ROLE_LABELS).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>{v}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>واحد سازمانی</Label>
+                    <Select dir="rtl" value={eUnit} onValueChange={setEUnit}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {UNITS.map((un) => (
+                          <SelectItem key={un} value={un}>{un}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>وضعیت حساب</Label>
+                    <Select dir="rtl" value={eStatus} onValueChange={setEStatus}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>{v}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>رمز عبور جدید (اختیاری — خالی بگذارید تا تغییر نکند)</Label>
+                  <Input dir="ltr" className="text-left" type="text" value={ePass} onChange={(e) => setEPass(e.target.value)} placeholder="حداقل ۸ نویسه" />
+                </div>
+                <div className="space-y-2">
+                  <Label>رنگ آواتار</Label>
+                  <div className="flex gap-2">
+                    {AVATAR_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setEColor(c)}
+                        className={`size-7 rounded-full transition-transform ${eColor === c ? "scale-110 ring-2 ring-offset-2 ring-foreground" : ""}`}
+                        style={{ backgroundColor: c }}
+                        aria-label={`رنگ ${c}`}
                       />
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>دسترسی به سامانه‌ها</Label>
+                  <div className="space-y-2">
+                    {systems.map((s) => {
+                      const has = eSystems.includes(s.id);
+                      return (
+                        <div key={s.id} className="flex items-center gap-3 rounded-xl border px-3 py-2">
+                          <SystemIcon name={s.icon} color={s.color} className="size-7" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{s.name}</p>
+                            <p dir="ltr" className="text-[10px] text-muted-foreground text-right font-mono">
+                              {s.url.replace(/^https?:\/\//, "")}
+                            </p>
+                          </div>
+                          <Switch
+                            checked={has}
+                            onCheckedChange={(v) =>
+                              setESystems((cur) => (v ? [...cur, s.id] : cur.filter((x) => x !== s.id)))
+                            }
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <Button className="w-full" onClick={saveEdit} disabled={saving}>
+                  {saving ? <Loader2 className="size-4 animate-spin" /> : "ذخیره تغییرات"}
+                </Button>
               </div>
-              <Button
-                className="w-full"
-                onClick={() => saveAccess(editUser, editUser.systemIds || [])}
-                disabled={saving}
-              >
-                {saving ? <Loader2 className="size-4 animate-spin" /> : "ذخیره مجوزها"}
-              </Button>
             </>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* تأیید حذف کامل */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف کامل کاربر؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              کاربر «{deleteTarget?.name}» ({deleteTarget?.email}) به‌همراه نشست‌ها، مجوز سامانه‌ها،
+              وظایف، یادداشت‌ها و پیام‌های او برای همیشه حذف می‌شود و قابل بازگشت نیست.
+              اگر فقط می‌خواهید دسترسی او را موقتاً قطع کنید، از «تعلیق حساب» یا «غیرفعال‌سازی» استفاده کنید.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>انصراف</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                hardDelete();
+              }}
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="size-4 animate-spin" /> : "حذف کامل"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* کاربر جدید */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -448,49 +650,47 @@ export default function AdminUsersPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>نقش</Label>
-                <Select dir="rtl" value={fRole} onValueChange={setFRole}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(ROLE_LABELS).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>شماره تماس</Label>
+                <Input dir="ltr" className="text-left" value={fPhone} onChange={(e) => setFPhone(e.target.value)} placeholder="09xxxxxxxxx" />
               </div>
               <div className="space-y-2">
-                <Label>واحد سازمانی</Label>
-                <Select dir="rtl" value={fUnit} onValueChange={setFUnit}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Label>نقش</Label>
+                <Select dir="rtl" value={fRole} onValueChange={setFRole}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {UNITS.map((u) => (
-                      <SelectItem key={u} value={u}>
-                        {u}
-                      </SelectItem>
+                    {Object.entries(ROLE_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>رنگ آواتار</Label>
-              <div className="flex gap-2">
-                {AVATAR_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setFColor(c)}
-                    className={`size-7 rounded-full transition-transform ${fColor === c ? "scale-110 ring-2 ring-offset-2 ring-foreground" : ""}`}
-                    style={{ backgroundColor: c }}
-                    aria-label={`رنگ ${c}`}
-                  />
-                ))}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>واحد سازمانی</Label>
+                <Select dir="rtl" value={fUnit} onValueChange={setFUnit}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {UNITS.map((un) => (
+                      <SelectItem key={un} value={un}>{un}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>رنگ آواتار</Label>
+                <div className="flex gap-2 h-9 items-center">
+                  {AVATAR_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setFColor(c)}
+                      className={`size-7 rounded-full transition-transform ${fColor === c ? "scale-110 ring-2 ring-offset-2 ring-foreground" : ""}`}
+                      style={{ backgroundColor: c }}
+                      aria-label={`رنگ ${c}`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
             <div className="space-y-2">

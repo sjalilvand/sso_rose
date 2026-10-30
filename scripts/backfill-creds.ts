@@ -20,7 +20,7 @@ const MAP: Record<string, { clientId: string; clientSecret: string }> = {
     clientId: "rose-psy-5c3f9b",
     clientSecret: "1d5f9b3e7a0c4e82f6b0d2a8c4e1f735a9d0c6e2b8f4a0d6c2e8b1f5a3d7c940",
   },
-  "تکنورز": {
+  "حضور و غیاب": {
     clientId: "rose-techno-8a4e1f",
     clientSecret: "4b8e2f6a0d1c5e93a7f3b9d1c0e6f428b5a9d3e1c7f5a0b2d8e4c6f0a2b7d139",
   },

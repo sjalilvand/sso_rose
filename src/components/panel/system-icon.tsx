@@ -6,6 +6,7 @@ import {
   Building2,
   Brain,
   Cpu,
+  CalendarCheck,
   Globe,
   type LucideIcon,
 } from "lucide-react";
@@ -16,6 +17,7 @@ const ICONS: Record<string, LucideIcon> = {
   Building2,
   Brain,
   Cpu,
+  CalendarCheck,
   Globe,
 };
 

@@ -1,11 +1,11 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 <#
 .SYNOPSIS
-  رفع مشکل ورود یکپارچه (SSO) تکنورز (سامانه حضور و غیاب) روی پورت‌های 3005/8085
+  رفع مشکل ورود یکپارچه (SSO) سامانه حضور و غیاب روی پورت‌های 3005/8085
   + تست سرتاسری SSO هر سه سامانه.
 
 .DESCRIPTION
-  علامت: مصرف توکن SSO در تکنورز پاسخ 404 می‌دهد، در حالی که کد ریپو
+  علامت: مصرف توکن SSO در حضور و غیاب پاسخ 404 می‌دهد، در حالی که کد ریپو
   (config/urls.py -> path("auth/rose-sso/")) و requirements.lock (شامل PyJWT)
   هر دو درست هستند.
 
@@ -203,7 +203,7 @@ if (-not $up) {
     Write-Err2 "env یا venv یافت نشد ($envCmd / $venvPy) — اجرای سرویس را دستی بررسی کنید"
   }
 }
-if ($up) { Write-Ok "بک‌اند تکنورز روی پورت $ApiPort سالم است (/api/v1/health/ = 200)" }
+if ($up) { Write-Ok "بک‌اند حضور و غیاب روی پورت $ApiPort سالم است (/api/v1/health/ = 200)" }
 else {
   Write-Err2 'بک‌اند بالا نیامد — لاگ سرویس را ببینید:'
   Get-ChildItem "$Stack\logs" -Filter 'RoseApi*' -ErrorAction SilentlyContinue | ForEach-Object {
@@ -282,7 +282,7 @@ $targets = @(
      UrlIn  = 'http://127.0.0.1:8083/sso/rose';
      UrlOut = 'http://130.185.73.157:8083/sso/rose';
      Mode = 'redirect'; Marker = 'panel' },
-  @{ Name = 'تکنورز';   ClientId = 'rose-techno-8a4e1f';
+  @{ Name = 'حضور و غیاب';   ClientId = 'rose-techno-8a4e1f';
      UrlIn  = 'http://127.0.0.1:8085/api/v1/auth/rose-sso/';
      UrlOut = 'http://130.185.73.157:8085/api/v1/auth/rose-sso/';
      Mode = 'json'; Marker = 'access' }
@@ -344,7 +344,7 @@ foreach ($r in $results) {
 Write-Host ''
 Write-Host '  اگر همه سبز بودند، در مرورگر تست کنید:'
 Write-Host '    ۱) http://130.185.73.157:8082 — ورود با admin@rose.ir'
-Write-Host '    ۲) صفحهٔ «سامانه‌ها» — کلیک روی رز سای / رز سنتر / تکنورز'
+Write-Host '    ۲) صفحهٔ «سامانه‌ها» — کلیک روی رز سای / رز سنتر / حضور و غیاب'
 Write-Host '       باید بدون فرم ورود وارد شوید'
 Write-Host '    ۳) اگر صفحهٔ قدیمی دیدید: Ctrl+F5 (پاک‌کردن کش مرورگر)'
 Write-Host ''

@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 <#
 .SYNOPSIS
   رفع مشکل ورود یکپارچه (SSO) رز سنتر روی پورت 8083 + تست سرتاسری SSO هر سه سامانه.
@@ -340,7 +340,7 @@ $targets = @(
      UrlIn  = ("http://127.0.0.1:{0}/sso/rose" -f $ExternalPort);
      UrlOut = ("http://130.185.73.157:{0}/sso/rose" -f $ExternalPort);
      Mode = 'redirect'; Marker = 'panel' },
-  @{ Name = 'تکنورز';   ClientId = 'rose-techno-8a4e1f';
+  @{ Name = 'حضور و غیاب';   ClientId = 'rose-techno-8a4e1f';
      UrlIn  = 'http://127.0.0.1:8085/api/v1/auth/rose-sso/';
      UrlOut = 'http://130.185.73.157:8085/api/v1/auth/rose-sso/';
      Mode = 'json'; Marker = 'access' }
@@ -402,7 +402,7 @@ foreach ($r in $results) {
 Write-Host ''
 Write-Host '  اگر همه سبز بودند، در مرورگر تست کنید:'
 Write-Host '    ۱) http://130.185.73.157:8082 — ورود با admin@rose.ir'
-Write-Host '    ۲) صفحهٔ «سامانه‌ها» — کلیک روی رز سای / رز سنتر / تکنورز'
+Write-Host '    ۲) صفحهٔ «سامانه‌ها» — کلیک روی رز سای / رز سنتر / حضور و غیاب'
 Write-Host '       باید بدون فرم ورود وارد شوید'
 Write-Host '    ۳) اگر صفحهٔ قدیمی دیدید: Ctrl+F5 (پاک‌کردن کش مرورگر)'
 Write-Host ''

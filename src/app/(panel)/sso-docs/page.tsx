@@ -156,7 +156,7 @@ const SYSTEM_LINKS: { name: string; url: string }[] = [
   { name: "رز آکادمی", url: "https://roseacademy.ir/" },
   { name: "رز سنتر", url: "https://rosecenter.ir/" },
   { name: "رز سای", url: "https://rosepsy.ir/" },
-  { name: "تکنورز", url: "https://technorose.ir/" },
+  { name: "حضور و غیاب", url: "http://130.185.73.157:8085/" },
 ];
 
 function CodeBlock({ code }: { code: string }) {
@@ -212,7 +212,7 @@ export default function SsoDocsPage() {
         </h1>
         <p className="text-sm text-muted-foreground mt-2 leading-7">
           این راهنما برای تیم‌های فنی سامانه‌های مجموعه (راه زندگی، رز آکادمی، رز سنتر، رز سای و
-          تکنورز) تهیه شده تا بدون وابستگی به سازندگان اولیه، بتوانند سامانه خود را به ورود یکپارچه
+          حضور و غیاب) تهیه شده تا بدون وابستگی به سازندگان اولیه، بتوانند سامانه خود را به ورود یکپارچه
           رز هاب متصل کنند. کل فرآیند پیاده‌سازی سمت سامانه مقصد حدود ۱ تا ۲ ساعت کار است و به هیچ
           تغییر سمت رز هاب نیاز ندارد.
         </p>

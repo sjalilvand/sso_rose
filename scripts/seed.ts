@@ -186,11 +186,11 @@ async function main() {
   });
   const sysTechno = await prisma.clinicSystem.create({
     data: {
-      name: "تکنورز",
+      name: "حضور و غیاب",
       clientId: "rose-techno-8a4e1f", clientSecret: "4b8e2f6a0d1c5e93a7f3b9d1c0e6f428b5a9d3e1c7f5a0b2d8e4c6f0a2b7d139",
-      url: "https://technorose.ir/",
-      description: "بخش فناوری و توسعه محصولات مجموعه",
-      icon: "Cpu",
+      url: "http://130.185.73.157:8085/",
+      description: "سامانه ثبت و مدیریت حضور، غیاب و کارکرد پرسنل",
+      icon: "CalendarCheck",
       color: "#d97706",
       connectionLevel: "BASIC",
       status: "متصل",

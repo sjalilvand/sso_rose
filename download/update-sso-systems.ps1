@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 <#
 .SYNOPSIS
   به‌روزرسانی سه سامانه متصل به رز هاب روی سرور 130.185.73.157 — فعال‌سازی ورود یکپارچه (SSO).
@@ -9,7 +9,7 @@
 
     ۱) رز سای       (special-spoon)     -> پورت 80    -> ارتقا با اسکریپت native خودش
     ۲) رز سنتر      (rosecenter)        -> پورت 8083  -> گیت + pip + اجرای دوباره
-    ۳) تکنورز       (rose-attendance)   -> پورت 8085  -> گیت + ری‌استارت سرویس‌های ویندوزی
+    ۳) حضور و غیاب       (rose-attendance)   -> پورت 8085  -> گیت + ری‌استارت سرویس‌های ویندوزی
 
   پس از اجرا، کاربرِ واردشده در رز هاب (http://130.185.73.157:8082) با کلیک روی
   هر سامانه بدون تکرار یوزر/پسورد وارد می‌شود؛ دکمه «ورود یکپارچه با رز هاب»
@@ -137,10 +137,10 @@ if (-not $SkipRosecenter) {
 } else { Write-Step '۲/۳ رز سنتر — رد شد (SkipRosecenter)' }
 
 # ================================================================
-# ۳) تکنورز (rose-attendance) — پورت 8085
+# ۳) حضور و غیاب (rose-attendance) — پورت 8085
 # ================================================================
 if (-not $SkipAttendance) {
-  Write-Step '۳/۳ تکنورز — همگام‌سازی کد از گیت‌هاب'
+  Write-Step '۳/۳ حضور و غیاب — همگام‌سازی کد از گیت‌هاب'
   if (Test-Path (Join-Path $AttendanceDir '.git')) {
     Push-Location $AttendanceDir
     try {
@@ -148,20 +148,20 @@ if (-not $SkipAttendance) {
       if ($LASTEXITCODE -ne 0) { throw 'git fetch ناموفق بود' }
       & git reset --hard origin/main
       if ($LASTEXITCODE -ne 0) { throw 'git reset ناموفق بود' }
-      Write-Ok 'کد تکنورز به‌روز شد (شامل dist فرانت‌اند با handoff توکن SSO)'
+      Write-Ok 'کد حضور و غیاب به‌روز شد (شامل dist فرانت‌اند با handoff توکن SSO)'
     } catch {
-      Write-Err2 "تکنورز: $($_.Exception.Message)"
+      Write-Err2 "حضور و غیاب: $($_.Exception.Message)"
     } finally {
       Pop-Location
     }
-    Write-Step '۳/۳ تکنورز — ری‌استارت سرویس‌های ویندوزی (RoseApi و ...)'
+    Write-Step '۳/۳ حضور و غیاب — ری‌استارت سرویس‌های ویندوزی (RoseApi و ...)'
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $AttendanceDir 'run-rose.ps1') -Restart
-    Write-Ok 'سرویس‌های تکنورز ری‌استارت شدند'
-    $summary += @{ N = 'تکنورز (8085)'; D = $AttendanceDir }
+    Write-Ok 'سرویس‌های حضور و غیاب ری‌استارت شدند'
+    $summary += @{ N = 'حضور و غیاب (8085)'; D = $AttendanceDir }
   } else {
-    Write-Warn2 "مخزن تکنورز یافت نشد: $AttendanceDir — اگر مسیر دیگری است با -AttendanceDir بدهید"
+    Write-Warn2 "مخزن حضور و غیاب یافت نشد: $AttendanceDir — اگر مسیر دیگری است با -AttendanceDir بدهید"
   }
-} else { Write-Step '۳/۳ تکنورز — رد شد (SkipAttendance)' }
+} else { Write-Step '۳/۳ حضور و غیاب — رد شد (SkipAttendance)' }
 
 # ================================================================
 # ۴) تست SSM خودِ SSO روی هر سه سامانه (از داخل سرور)
@@ -184,7 +184,7 @@ Test-SSOMarker 'رز سنتر (8083): مسیر /sso/rose فعال است (رید
   $loc = & curl.exe -s -o NUL -w "%{redirect_url}" "http://127.0.0.1:$RosecenterPort/sso/rose"
   "$loc" -match 'sso/launch'
 }
-Test-SSOMarker 'تکنورز (8085): دست‌به‌دست‌کننده rose-sso در صفحه اصلی فعال است' {
+Test-SSOMarker 'حضور و غیاب (8085): دست‌به‌دست‌کننده rose-sso در صفحه اصلی فعال است' {
   $c = (Invoke-WebRequest -Uri 'http://127.0.0.1:8085/' -UseBasicParsing -TimeoutSec 15).Content
   $c -match 'rose-sso'
 }
@@ -200,7 +200,7 @@ foreach ($s in $summary) { Write-Host ("  {0,-22} مسیر: {1}" -f $s.N, $s.D) 
 Write-Host ''
 Write-Host '  حالا این‌طور تست کنید:'
 Write-Host '    ۱) در مرورگر http://130.185.73.157:8082 را باز و وارد شوید'
-Write-Host '    ۲) از «سامانه‌ها» روی رز سای / رز سنتر / تکنورز کلیک کنید'
+Write-Host '    ۲) از «سامانه‌ها» روی رز سای / رز سنتر / حضور و غیاب کلیک کنید'
 Write-Host '       — باید بدون فرم ورود، وارد همان سامانه شوید'
 Write-Host '    ۳) اگر صفحه تغییری نکرد: Ctrl+F5 (پاک‌شدن کش مرورگر)'
 Write-Host ''
