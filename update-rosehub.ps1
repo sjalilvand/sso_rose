@@ -175,6 +175,31 @@ if ($dbHad) {
     Write-Ok "Database restored from backup (server data kept)"
 }
 
+# ---------- Step 4b/9: ensure .env points at THIS install folder ----------
+# .env was once committed by mistake with a developer-machine path; a git
+# reset then overwrote the server's correct file and Prisma silently created
+# an empty database elsewhere. Normalize DATABASE_URL on every update.
+Write-Step "Step 4b/9 - Ensure .env (DATABASE_URL)"
+$envFile   = Join-Path $InstallDir ".env"
+$canonical = 'DATABASE_URL="file:../db/custom.db"'
+$needsFix  = $true
+if (Test-Path $envFile) {
+    foreach ($line in (Get-Content $envFile -ErrorAction SilentlyContinue)) {
+        if ($line -match '^\s*DATABASE_URL\s*=\s*"?file:\.\./db/custom\.db"?\s*$') { $needsFix = $false; break }
+    }
+}
+if ($needsFix) {
+    $kept = @()
+    if (Test-Path $envFile) {
+        $kept = @(Get-Content $envFile -ErrorAction SilentlyContinue | Where-Object { $_ -notmatch '^\s*DATABASE_URL\s*=' })
+    }
+    $kept += $canonical
+    Set-Content -Path $envFile -Value $kept -Encoding ASCII
+    Write-Ok ".env normalized: DATABASE_URL=file:../db/custom.db (this install's db\custom.db)"
+} else {
+    Write-Ok ".env already points at this install's db\custom.db"
+}
+
 # ---------- Step 5/9: npm install (Iranian mirror first, then default) ----------
 Write-Step "Step 5/9 - Install npm dependencies"
 $mirror = "https://archive.ito.gov.ir/mirror2/npm/"
@@ -256,6 +281,7 @@ for ($i = 0; $i -lt 15; $i++) {
 }
 if ($healthy) {
     Write-Ok "Rose Hub is healthy on port $Port"
+    node scripts\db-stats.cjs
     Write-Host ""
     Write-Host "================================================================="
     Write-Host "  Rose Hub update finished"
