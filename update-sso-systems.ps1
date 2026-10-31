@@ -16,7 +16,7 @@
   هم به صفحه ورود هر سه سامانه اضافه می‌شود.
 
   دستور اجرا (PowerShell مدیر):
-    powershell -ExecutionPolicy Bypass -File C:\update-sso-systems.ps1
+    powershell -ExecutionPolicy Bypass -File C:\update-sso-systems.ps1 -GithubToken "ghp_..."
 
   اجرای گزینشی:
     powershell -ExecutionPolicy Bypass -File C:\update-sso-systems.ps1 -SkipRosepsy
@@ -27,6 +27,7 @@ param(
   [string]$RosecenterDir = "C:\rosecenter-deploy",
   [string]$AttendanceDir = "C:\rose-attendance",
   [int]$RosecenterPort = 8083,
+  [string]$GithubToken = "",
   [switch]$SkipRosepsy,
   [switch]$SkipRosecenter,
   [switch]$SkipAttendance
@@ -50,6 +51,27 @@ if (-not $isAdmin) {
 }
 
 $summary = @()
+
+# ================================================================
+# ۰) به‌روزرسانی توکن گیت‌هاب روی هر سه مخزن (اگر داده شده باشد)
+#    توکن منقضی باعث خطای git fetch و توقف به‌روزرسانی می‌شود.
+# ================================================================
+if ($GithubToken -ne "") {
+  Write-Step '۰/۳ ثبت توکن گیت‌هاب روی مخزن‌های سرور'
+  $remotes = @(
+    @{ P = (Join-Path $RosepsyDir 'app');            U = "https://sjalilvand:$GithubToken@github.com/sjalilvand/special-spoon.git" },
+    @{ P = $RosecenterDir;                            U = "https://sjalilvand:$GithubToken@github.com/sjalilvand/rosecenter.git" },
+    @{ P = $AttendanceDir;                            U = "https://sjalilvand:$GithubToken@github.com/sjalilvand/rose-attendance.git" }
+  )
+  foreach ($r in $remotes) {
+    if (Test-Path (Join-Path $r.P '.git')) {
+      & git -C $r.P remote set-url origin $r.U 2>$null
+      Write-Ok ("توکن روی {0} ثبت شد" -f $r.P)
+    } else {
+      Write-Warn2 ("مخزن یافت نشد: {0}" -f $r.P)
+    }
+  }
+}
 
 # ================================================================
 # ۱) رز سای (special-spoon) — پورت 80
@@ -154,6 +176,13 @@ if (-not $SkipAttendance) {
     } finally {
       Pop-Location
     }
+    Write-Step '۳/۳ حضور و غیاب — اعمال مهاجرت‌های دیتابیس (Django migrate)'
+    Push-Location (Join-Path $AttendanceDir 'backend')
+    try {
+      & python manage.py migrate --noinput
+      if ($LASTEXITCODE -ne 0) { Write-Warn2 'migrate خطا داد — خروجی بالا را بررسی کنید (فیلدهای پروفایل SSO اعمال نشده)' }
+      else { Write-Ok 'مهاجرت‌ها اعمال شد (شامل فیلدهای پروفایل SSO رز هاب)' }
+    } finally { Pop-Location }
     Write-Step '۳/۳ حضور و غیاب — ری‌استارت سرویس‌های ویندوزی (RoseApi و ...)'
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $AttendanceDir 'run-rose.ps1') -Restart
     Write-Ok 'سرویس‌های حضور و غیاب ری‌استارت شدند'
