@@ -7,17 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/input-otp";
-import { Loader2, Lock, User, ShieldCheck, Sparkles } from "lucide-react";
+import { Loader2, Lock, User, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
-
-const DEMO_ACCOUNTS = [
-  { email: "admin@rose.ir", label: "مدیر کل — دکتر سارا محمدی" },
-  { email: "manager@rose.ir", label: "مدیر واحد — مهندس علی رضایی" },
-  { email: "therapist@rose.ir", label: "درمانگر — دکتر مریم کریمی" },
-  { email: "staff@rose.ir", label: "پذیرش — زهرا موسوی" },
-  { email: "teacher@rose.ir", label: "مدرس — امیر حسینی" },
-];
 
 function LoginForm() {
   const router = useRouter();
@@ -144,7 +136,6 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* ستون معرفی */}
@@ -202,31 +193,6 @@ export default function LoginPage() {
             </CardContent>
           </Card>
 
-          {/* حساب‌های نمایشی */}
-          <Card className="border-dashed">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Sparkles className="size-4 text-primary" />
-                حساب‌های نمایشی (رمز همه: <span dir="ltr" className="font-mono">rose1234</span>)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1.5 pt-0">
-              {DEMO_ACCOUNTS.map((a) => (
-                <button
-                  key={a.email}
-                  onClick={() => setEmail(a.email)}
-                  className={`w-full text-right rounded-lg px-3 py-2 text-sm transition-colors flex items-center justify-between hover:bg-accent ${
-                    email === a.email ? "bg-accent" : ""
-                  }`}
-                >
-                  <span>{a.label}</span>
-                  <span dir="ltr" className="text-xs text-muted-foreground font-mono">
-                    {a.email}
-                  </span>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
           <p className="text-center text-xs text-muted-foreground">
             ورود یکپارچه به معنای دسترسی به همه سامانه‌ها نیست؛ مجوز هر سامانه جداگانه تعیین می‌شود.
           </p>
