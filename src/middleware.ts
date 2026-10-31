@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth-edge";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/otp", "/api/health", "/api/sso/config", "/api/sso/launch"];
+// /api/sso/profile — استعلام سرویس‌به‌سرویس مشخصات کاربر توسط سامانه‌های متصل؛
+// خود مسیر clientId/clientSecret را اعتبارسنجی می‌کند (route.ts) و نباید پشت
+// کوکی نشست رز هاب گیر بیفتد وگرنه همگام‌سازی ورود محلی سامانه‌ها بی‌صدا شکست می‌خورد.
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/otp", "/api/health", "/api/sso/config", "/api/sso/launch", "/api/sso/profile"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
