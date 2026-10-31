@@ -36,6 +36,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       jobTitle?: string;
       phone?: string;
       province?: string;
+      clinic?: string;
       education?: string;
       workLicense?: string;
       profRank?: string;
@@ -87,6 +88,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     if (body.jobTitle !== undefined) data.jobTitle = body.jobTitle;
     if (body.phone !== undefined) data.phone = body.phone;
     if (body.province !== undefined) data.province = body.province;
+    if (body.clinic !== undefined) data.clinic = body.clinic;
     if (body.education !== undefined) data.education = body.education;
     if (body.workLicense !== undefined) data.workLicense = body.workLicense;
     if (body.profRank !== undefined) data.profRank = body.profRank;

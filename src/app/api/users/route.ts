@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
         jobTitle: true,
         phone: true,
         province: true,
+        clinic: true,
         education: true,
         workLicense: true,
         profRank: true,
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
       jobTitle?: string;
       phone?: string;
       province?: string;
+      clinic?: string;
       education?: string;
       workLicense?: string;
       profRank?: string;
@@ -120,6 +122,7 @@ export async function POST(req: NextRequest) {
         jobTitle: body.jobTitle || "",
         phone: body.phone || "",
         province: body.province || "",
+        clinic: body.clinic || "",
         education: body.education || "",
         workLicense: body.workLicense || "",
         profRank: body.profRank || "",

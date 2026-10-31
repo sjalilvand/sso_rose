@@ -35,6 +35,7 @@ model User {
   jobTitle         String     @default("")
   phone            String     @default("")
   province         String     @default("") // استان
+  clinic           String     @default("") // کلینک محل خدمت
   education        String     @default("") // مدرک تحصیلی
   workLicense      String     @default("") // پروانه اشتغال (دارد / ندارد)
   profRank         String     @default("") // رتبه حرفه‌ای

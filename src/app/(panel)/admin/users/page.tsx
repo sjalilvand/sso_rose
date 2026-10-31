@@ -81,6 +81,7 @@ interface U {
   jobTitle: string;
   phone: string;
   province?: string;
+  clinic?: string;
   education?: string;
   workLicense?: string;
   profRank?: string;
@@ -180,6 +181,7 @@ export default function AdminUsersPage() {
   // مشخصات پرونده (مطابق فایل مشاورین)
   const [eNid, setENid] = useState("");
   const [eProvince, setEProvince] = useState("");
+  const [eClinic, setEClinic] = useState("");
   const [eEdu, setEEdu] = useState("");
   const [eLicense, setELicense] = useState("");
   const [eRank, setERank] = useState("");
@@ -198,6 +200,8 @@ export default function AdminUsersPage() {
   const [fUnit, setFUnit] = useState("پذیرش");
   const [fTitle, setFTitle] = useState("");
   const [fPhone, setFPhone] = useState("");
+  const [fClinic, setFClinic] = useState("");
+  const [fProvince, setFProvince] = useState("");
   const [fColor, setFColor] = useState(AVATAR_COLORS[2]);
   const [fSystems, setFSystems] = useState<string[]>([]);
 
@@ -246,6 +250,7 @@ export default function AdminUsersPage() {
           u.email.includes(search) ||
           u.unit.includes(search) ||
           (u.phone || "").includes(search) ||
+          (u.clinic || "").includes(search) ||
           (u.username || "").includes(search)
       ),
     [users, search]
@@ -270,6 +275,8 @@ export default function AdminUsersPage() {
           unit: fUnit,
           jobTitle: fTitle,
           phone: fPhone,
+          clinic: fClinic,
+          province: fProvince,
           avatarColor: fColor,
           systemIds: fSystems,
         },
@@ -282,6 +289,8 @@ export default function AdminUsersPage() {
       setFPass("");
       setFTitle("");
       setFPhone("");
+      setFClinic("");
+      setFProvince("");
       setFSystems([]);
       await load();
     } catch (err) {
@@ -306,6 +315,7 @@ export default function AdminUsersPage() {
     setESystems(u.systemIds || []);
     setENid(u.username || "");
     setEProvince(u.province || "");
+    setEClinic(u.clinic || "");
     setEEdu(u.education || "");
     setELicense(u.workLicense || "");
     setERank(u.profRank || "");
@@ -342,6 +352,7 @@ export default function AdminUsersPage() {
           avatarColor: eColor,
           systemIds: eSystems,
           province: eProvince,
+          clinic: eClinic,
           education: eEdu,
           workLicense: eLicense,
           profRank: eRank,
@@ -538,7 +549,10 @@ export default function AdminUsersPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-xs">{u.unit}</TableCell>
+                  <TableCell className="hidden md:table-cell text-xs">
+                    {u.unit}
+                    {u.clinic ? <p className="text-[10px] text-muted-foreground">{u.clinic}</p> : null}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="text-[10px]" style={{ color: ROLE_COLORS[u.role as keyof typeof ROLE_COLORS] }}>
                       {ROLE_LABELS[u.role as keyof typeof ROLE_LABELS]}
@@ -714,6 +728,10 @@ export default function AdminUsersPage() {
                       <Input value={eProvince} onChange={(e) => setEProvince(e.target.value)} />
                     </div>
                     <div className="space-y-2">
+                      <Label>کلینک محل خدمت</Label>
+                      <Input value={eClinic} onChange={(e) => setEClinic(e.target.value)} placeholder="مثلاً کلینیک رز" />
+                    </div>
+                    <div className="space-y-2">
                       <Label>مدرک تحصیلی</Label>
                       <Input value={eEdu} onChange={(e) => setEEdu(e.target.value)} />
                     </div>
@@ -859,6 +877,16 @@ export default function AdminUsersPage() {
               <div className="space-y-2">
                 <Label>عنوان شغلی</Label>
                 <Input value={fTitle} onChange={(e) => setFTitle(e.target.value)} placeholder="مثلاً روان‌شناس" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>کلینک محل خدمت</Label>
+                <Input value={fClinic} onChange={(e) => setFClinic(e.target.value)} placeholder="مثلاً کلینیک رز" />
+              </div>
+              <div className="space-y-2">
+                <Label>استان (اختیاری)</Label>
+                <Input value={fProvince} onChange={(e) => setFProvince(e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

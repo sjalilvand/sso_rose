@@ -94,12 +94,20 @@ export async function signSSOToken(params: {
   clientId: string;
   clientSecret: string;
   username?: string | null; // کد ملی — شناسه پایدار برای سامانه مقصد
+  mobile?: string | null; // شماره موبایل
+  province?: string | null; // استان
+  provinceCode?: string | null; // کد استان
+  clinic?: string | null; // کلینک محل خدمت
 }): Promise<{ token: string; expiresAt: Date }> {
   const token = await new SignJWT({
     email: params.email,
     name: params.name,
     role: params.role,
     nationalId: params.username || null,
+    mobile: params.mobile || null,
+    province: params.province || null,
+    provinceCode: params.provinceCode || null,
+    clinic: params.clinic || null,
     systemId: params.systemId,
     systemName: params.systemName,
     scope: "sso-launch",
