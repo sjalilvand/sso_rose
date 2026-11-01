@@ -265,9 +265,38 @@ if (Test-PortBusy $Port) {
     pm2 restart $pm2Name --update-env
     Write-Ok "PM2: $pm2Name restarted"
 } else {
-    pm2 start ecosystem.config.js
+    pm2 start ecosystem.config.js --only rose-hub
     pm2 save 2>$null | Out-Null
     Write-Ok "PM2: app started from ecosystem.config.js"
+}
+
+# ---------- Step 9b/9: Bale support bot (@rosepro_bot) under PM2 ----------
+Write-Step "Step 9b/9 - Bale support bot (PM2)"
+$botInList = $false
+try {
+    foreach ($app in @(pm2 jlist 2>$null | ConvertFrom-Json)) {
+        if ([string]$app.name -eq "rose-bale-bot") { $botInList = $true }
+    }
+} catch {}
+if ($botInList) {
+    pm2 restart rose-bale-bot --update-env 2>$null | Out-Null
+    Write-Ok "PM2: rose-bale-bot restarted"
+} else {
+    pm2 start ecosystem.config.js --only rose-bale-bot 2>$null | Out-Null
+    Write-Ok "PM2: rose-bale-bot started (first time)"
+}
+pm2 save 2>$null | Out-Null
+Start-Sleep -Seconds 3
+$botOnline = $false
+try {
+    foreach ($app in @(pm2 jlist 2>$null | ConvertFrom-Json)) {
+        if ([string]$app.name -eq "rose-bale-bot" -and [string]$app.pm2_env.status -eq "online") { $botOnline = $true }
+    }
+} catch {}
+if ($botOnline) {
+    Write-Ok "Bale bot @rosepro_bot is online (password reset + support via Bale messenger)"
+} else {
+    Write-Warn2 "rose-bale-bot is not online - check: pm2 logs rose-bale-bot --lines 20"
 }
 
 Write-Host ""
@@ -288,11 +317,12 @@ if ($healthy) {
     Write-Host "================================================================="
     Write-Host "  URL              : http://130.185.73.157:$Port"
     Write-Host "  In this version  :"
-    Write-Host "    - Bulk user import from the standard Excel file: national ID ="
-    Write-Host "      username, mobile number = initial password (User management)"
-    Write-Host "    - Login with national ID (code melli) or email"
-    Write-Host "    - Consultant profile fields (province, education, license,"
-    Write-Host "      rank, contract no, personal code, bank sheba) stored"
+    Write-Host "    - Mobile-friendly login + QR code (left side) to open the hub on phones"
+    Write-Host "    - PWA manifest: the hub can be added to the phone home screen"
+    Write-Host "    - Self-service registration with admin approval (login only after"
+    Write-Host "      approval in: management -> Registration requests)"
+    Write-Host "    - Bale support bot @rosepro_bot: password reset + support inbox"
+    Write-Host "      (PM2 app: rose-bale-bot; users must link their account in the bot first)"
     Write-Host "    - Update script: safe stop + database backup/restore"
     Write-Host "  Tip: press Ctrl+F5 in the browser to bypass the cache."
     Write-Host "================================================================="
