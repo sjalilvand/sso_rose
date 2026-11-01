@@ -26,6 +26,30 @@ export async function POST(req: NextRequest) {
     const user = await db.user.findFirst({
       where: { OR: [{ email: identifier }, { username: identifier }] },
     });
+
+    // پیام دقیق برای ثبت‌نام‌های در انتظار تأیید یا ردشده (قبل از خطای عمومی اعتبارات)
+    if (!user) {
+      const nid = identifier.replace(/[^0-9]/g, "");
+      if (/^\d{10}$/.test(nid)) {
+        const reg = await db.registrationRequest.findUnique({ where: { nationalId: nid } });
+        if (reg?.status === "PENDING") {
+          await audit({ action: "تلاش ورود به حساب در انتظار تأیید", entity: "auth", details: nid, ip: ipFromRequest(req) });
+          throw new ApiError(
+            "حساب شما هنوز تأیید نشده است؛ درخواست ثبت‌نام شما در انتظار بررسی مدیر است. پس از تأیید، با همین کد ملی و رمز عبور وارد شوید.",
+            403,
+          );
+        }
+        if (reg?.status === "REJECTED") {
+          throw new ApiError(
+            reg.reviewNote
+              ? `درخواست ثبت‌نام شما تأیید نشده است (یادداشت مدیر: ${reg.reviewNote}). می‌توانید در صفحهٔ ثبت‌نام دوباره درخواست بدهید.`
+              : "درخواست ثبت‌نام شما تأیید نشده است؛ می‌توانید در صفحهٔ ثبت‌نام دوباره درخواست بدهید.",
+            403,
+          );
+        }
+      }
+    }
+
     if (!user || !verifyPassword(password, user.passwordHash)) {
       await audit({ action: "تلاش ناموفق ورود", entity: "auth", details: identifier, ip: ipFromRequest(req) });
       throw new ApiError("ایمیل/کد ملی یا رمز عبور نادرست است", 401);

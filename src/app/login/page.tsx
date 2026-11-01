@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/input-otp";
-import { Loader2, Lock, User, ShieldCheck } from "lucide-react";
+import { Loader2, Lock, User, ShieldCheck, Smartphone, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
+import QRCode from "qrcode";
 
 function LoginForm() {
   const router = useRouter();
@@ -90,6 +92,7 @@ function LoginForm() {
             id="password"
             type="password"
             dir="ltr"
+            autoComplete="current-password"
             placeholder="••••••••"
             className="pr-9 text-left"
             value={password}
@@ -131,15 +134,70 @@ function LoginForm() {
       <Button type="submit" className="w-full h-11 text-base" disabled={loading}>
         {loading ? <Loader2 className="size-5 animate-spin" /> : "ورود به رز هاب"}
       </Button>
+
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm">
+        <Link href="/register" className="text-primary hover:underline font-medium">
+          حساب ندارید؟ ثبت‌نام
+        </Link>
+        <Link href="/forgot-password" className="text-muted-foreground hover:text-primary hover:underline">
+          فراموشی رمز عبور؟
+        </Link>
+      </div>
     </form>
+  );
+}
+
+/** کارت QR — با موبایل اسکن شود و مستقیم صفحهٔ ورود رز هاب باز شود */
+function QrPanel() {
+  const [qr, setQr] = useState<string>("");
+
+  useEffect(() => {
+    const url = `${window.location.origin}/login`;
+    QRCode.toDataURL(url, {
+      width: 512,
+      margin: 1,
+      color: { dark: "#9f1239", light: "#ffffff" },
+      errorCorrectionLevel: "M",
+    })
+      .then(setQr)
+      .catch(() => setQr(""));
+  }, []);
+
+  return (
+    <Card className="border-border/60 shadow-lg shadow-rose-100/40 dark:shadow-none w-full max-w-md">
+      <CardHeader className="text-center pb-2">
+        <CardTitle className="flex items-center justify-center gap-2 text-lg">
+          <Smartphone className="size-5 text-primary" />
+          ورود با موبایل
+        </CardTitle>
+        <CardDescription>با دوربین موبایل این کد را اسکن کنید</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col items-center gap-3 pb-6">
+        <div className="rounded-2xl border bg-white p-3 shadow-inner">
+          {qr ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={qr} alt="بارکد ورود به رز هاب با موبایل" className="size-44 sm:size-52" />
+          ) : (
+            <div className="size-44 sm:size-52 flex items-center justify-center text-muted-foreground">
+              <QrCode className="size-16 animate-pulse" />
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground text-center leading-6">
+          اسکن این بارکد، صفحهٔ ورود رز هاب را روی تلفن همراه باز می‌کند.
+          <br />
+          همان حساب، همان رمز — بدون نصب برنامه.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
-      {/* ستون معرفی */}
-      <div className="relative lg:w-[46%] bg-gradient-to-br from-[#c2185b] via-[#d81b60] to-[#0f766e] text-white p-8 lg:p-14 flex flex-col justify-between overflow-hidden">
+      {/* ستون معرفی — در موبایل مخفی می‌شود تا فرم ورود فوراً دیده شود */}
+      <div className="relative hidden lg:flex lg:w-[46%] bg-gradient-to-br from-[#c2185b] via-[#d81b60] to-[#0f766e] text-white p-8 lg:p-14 flex-col justify-between overflow-hidden">
         <div className="absolute inset-0 opacity-[0.07]" aria-hidden>
           <div className="absolute -top-24 -right-24 size-96 rounded-full bg-white blur-3xl" />
           <div className="absolute bottom-0 -left-24 size-80 rounded-full bg-white blur-3xl" />
@@ -178,24 +236,44 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {/* ستون فرم ورود */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md space-y-6">
-          <Card className="border-border/60 shadow-lg shadow-rose-100/40 dark:shadow-none">
-            <CardHeader className="text-center">
-              <CardTitle className="text-xl">ورود به حساب کاربری</CardTitle>
-              <CardDescription>با ایمیل یا کد ملی و یک رمز عبور وارد شوید</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={<div className="h-40" />}>
-                <LoginForm />
-              </Suspense>
-            </CardContent>
-          </Card>
+      {/* ستون فرم ورود + بارکد موبایل (بارکد در سمت چپ قرار می‌گیرد) */}
+      <div className="flex-1 flex flex-col">
+        {/* سربرگ فشردهٔ موبایل */}
+        <div className="lg:hidden flex items-center gap-3 p-5 pb-0">
+          <div className="size-11 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Image src="/logo.svg" alt="رز هاب" width={28} height={28} />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold">رز هاب</h1>
+            <p className="text-xs text-muted-foreground">درگاه یکپارچه مجموعه کلینیک رز سفید</p>
+          </div>
+        </div>
 
-          <p className="text-center text-xs text-muted-foreground">
-            ورود یکپارچه به معنای دسترسی به همه سامانه‌ها نیست؛ مجوز هر سامانه جداگانه تعیین می‌شود.
-          </p>
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
+          <div className="w-full max-w-3xl flex flex-col xl:flex-row items-center xl:items-start justify-center gap-5">
+            <div className="w-full max-w-md space-y-5">
+              <Card className="border-border/60 shadow-lg shadow-rose-100/40 dark:shadow-none">
+                <CardHeader className="text-center">
+                  <CardTitle className="text-xl">ورود به حساب کاربری</CardTitle>
+                  <CardDescription>با ایمیل یا کد ملی و یک رمز عبور وارد شوید</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Suspense fallback={<div className="h-40" />}>
+                    <LoginForm />
+                  </Suspense>
+                </CardContent>
+              </Card>
+
+              <p className="text-center text-xs text-muted-foreground">
+                ورود یکپارچه به معنای دسترسی به همه سامانه‌ها نیست؛ مجوز هر سامانه جداگانه تعیین می‌شود.
+              </p>
+            </div>
+
+            {/* بارکد — در دسکتاپ سمت چپ فرم، در موبایل زیر فرم */}
+            <Suspense fallback={<div className="hidden" />}>
+              <QrPanel />
+            </Suspense>
+          </div>
         </div>
       </div>
     </div>

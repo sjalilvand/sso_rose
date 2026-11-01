@@ -27,6 +27,7 @@ import {
   Settings,
   Loader2,
   BookOpen,
+  ClipboardList,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -374,6 +375,14 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
               <SidebarGroupLabel>مدیریت</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/registrations")} tooltip="درخواست‌های ثبت‌نام">
+                      <Link href="/admin/registrations">
+                        <ClipboardList />
+                        <span>درخواست‌های ثبت‌نام</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/users")} tooltip="کاربران و مجوزها">
                       <Link href="/admin/users">

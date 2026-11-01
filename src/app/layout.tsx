@@ -17,6 +17,16 @@ export const metadata: Metadata = {
     "درگاه یکپارچه مدیریت، ارتباطات و همکاری مجموعه کلینیک رز سفید: ورود یکپارچه، داشبورد شخصی، وظایف، تقویم شمسی، اطلاعیه‌ها، گفتگوها و یادداشت‌ها",
   icons: {
     icon: "/logo.svg",
+    apple: "/icons/icon-192.png",
+  },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "رز هاب",
+  },
+  formatDetection: {
+    telephone: false,
   },
 };
 

@@ -24,6 +24,13 @@ enum UserStatus {
   INACTIVE
 }
 
+// وضعیت بررسی درخواست ثبت‌نام — ورود فقط پس از تأیید مدیر مجاز است
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id               String     @id @default(cuid())
   email            String     @unique
@@ -65,6 +72,65 @@ model User {
   notifications     Notification[]
   auditLogs         AuditLog[]
   taskComments      TaskComment[]
+
+  // ثبت‌نام و بات بله
+  reviewedRegistrations RegistrationRequest[]  @relation("RegistrationReviewer")
+  baleLink          BaleLink?
+  passwordResets    PasswordResetToken[]
+}
+
+// درخواست ثبت‌نام کاربر جدید — تا تأیید مدیر هیچ User ساخته نمی‌شود
+model RegistrationRequest {
+  id           String             @id @default(cuid())
+  fullName     String
+  nationalId   String             @unique // کد ملی — نام کاربری آینده
+  mobile       String
+  email        String             @default("")
+  passwordHash String
+  province     String             @default("")
+  clinic       String             @default("")
+  jobTitle     String             @default("")
+  status       RegistrationStatus @default(PENDING)
+  reviewNote   String             @default("")
+  reviewedById String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  reviewedBy User? @relation("RegistrationReviewer", fields: [reviewedById], references: [id])
+}
+
+// اتصال حساب کاربر رز هاب به چت بات بله (@rosepro_bot)
+model BaleLink {
+  id        String   @id @default(cuid())
+  chatId    String   @unique
+  userId    String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// توکن یک‌بارمصرف تغییر رمز — از طریق بات بله تحویل گرفته می‌شود
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique // SHA-256 توکن — توکن خام ذخیره نمی‌شود
+  code      String // ۶ رقم — برای تطبیق ذهنی کاربر
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// پیام‌های پشتیبانی دریافتی از بات بله
+model SupportTicket {
+  id        String   @id @default(cuid())
+  chatId    String   @default("")
+  sender    String   @default("کاربر بات بله")
+  subject   String   @default("پشتیبانی بات بله")
+  content   String
+  handled   Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 // دسترسی هر کاربر به هر سامانه

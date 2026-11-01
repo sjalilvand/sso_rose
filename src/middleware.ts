@@ -4,7 +4,8 @@ import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth-edge";
 // /api/sso/profile — استعلام سرویس‌به‌سرویس مشخصات کاربر توسط سامانه‌های متصل؛
 // خود مسیر clientId/clientSecret را اعتبارسنجی می‌کند (route.ts) و نباید پشت
 // کوکی نشست رز هاب گیر بیفتد وگرنه همگام‌سازی ورود محلی سامانه‌ها بی‌صدا شکست می‌خورد.
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/otp", "/api/health", "/api/sso/config", "/api/sso/launch", "/api/sso/profile"];
+// /register و /reset-password و /forgot-password — مسیرهای عمومی ثبت‌نام و بازیابی رمز.
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/otp", "/api/health", "/api/sso/config", "/api/sso/launch", "/api/sso/profile", "/register", "/api/auth/register", "/forgot-password", "/reset-password", "/api/auth/forgot-password", "/api/auth/reset-password", "/manifest.webmanifest"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
