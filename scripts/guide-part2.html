@@ -1,0 +1,156 @@
+<!-- ============================================================ -->
+<section class="card" id="s2">
+  <h2><span class="num">۲</span> راه‌اندازی سامانه‌ها پس از خاموش و روشن شدن سرور</h2>
+  <p class="lead">یک اسکریپت جامع می‌سازید و بعد از هر بار ری‌استارت سرور، فقط یک دستور اجرا می‌کنید.</p>
+
+  <h3>کدام سامانه‌ها بعد از ری‌استارت خودکار بالا می‌آیند؟</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>سامانه</th><th>وضعیت پس از ری‌استارت</th><th>توضیح</th></tr>
+    <tr><td><b>رز هاب</b> (8082) + بات بله</td><td>نیمه‌خودکار</td><td>با PM2 اجرا می‌شود؛ معمولاً با اولین ورود شما به سرور (RDP) بالا می‌آید. اگر نیامد <code class="i">pm2 resurrect</code></td></tr>
+    <tr><td><b>رز سای</b> (80)</td><td>خودکار</td><td>سرویس‌های ویندوزی <code class="i">rosepsy-*</code> روی استارت‌آپ Automatic تنظیم‌اند</td></tr>
+    <tr><td><b>رز سنتر</b> (8083)</td><td><b>دستی — همیشه</b></td><td>برنامهٔ سادهٔ پایتون است و سرویس ویندوزی ندارد؛ باید اجرا شود (پایین همین بخش)</td></tr>
+    <tr><td><b>تکنورز</b> (8085)</td><td>خودکار</td><td>سرویس‌های ویندوزی <code class="i">Rose*</code> خودکار بالا می‌آیند؛ فقط سلامت را چک کنید</td></tr>
+  </table></div>
+
+  <h3>روش پیشنهادی — اسکریپت جامع start-all-rose.ps1</h3>
+  <div class="step"><div class="n">۱</div><div class="b">
+    <h4>ساخت اسکریپت جامع — فقط یک‌بار</h4>
+    <p>در PowerShell با <b>Run as Administrator</b> بلوک زیر را کامل کپی و اجرا کنید تا فایل <code class="i">C:\start-all-rose.ps1</code> ساخته شود:</p>
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— ساخت اسکریپت جامع (یک‌بار)</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>$ps = @'
+# ============================================================
+#  start-all-rose.ps1 - bring all Rose systems up after reboot
+#  Run:  powershell -ExecutionPolicy Bypass -File C:\start-all-rose.ps1
+# ============================================================
+$ErrorActionPreference = 'Continue'
+$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
+function OK($m)   { Write-Host '  [OK]' $m -ForegroundColor Green }
+function BAD($m)  { Write-Host '  [!!]' $m -ForegroundColor Red }
+function Step($m) { Write-Host ''; Write-Host '==&gt;' $m -ForegroundColor Cyan }
+function Probe($url) {
+  try { $r = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 6; return ($r.StatusCode -lt 500) }
+  catch { return $false }
+}
+
+Step '1/4 Rose Hub + Bale bot (PM2, port 8082)'
+if (Probe 'http://127.0.0.1:8082/api/health') {
+  OK 'Rose Hub already running'
+} else {
+  pm2 resurrect 2&gt;$null
+  Start-Sleep -Seconds 6
+  if (-not (Probe 'http://127.0.0.1:8082/api/health')) {
+    Push-Location C:\RoseHub
+    pm2 start ecosystem.config.js 2&gt;$null
+    Pop-Location
+    Start-Sleep -Seconds 10
+  }
+  if (Probe 'http://127.0.0.1:8082/api/health') { OK 'Rose Hub up on 8082' } else { BAD 'Rose Hub not up - see: pm2 logs rose-hub' }
+  pm2 save 2&gt;$null
+}
+
+Step '2/4 Techno (port 8085, services Rose*)'
+$svc = Get-Service RoseApi,RoseNginx,RoseWorker,RoseBeat,RoseRedis -ErrorAction SilentlyContinue
+$stopped = @($svc | Where-Object { $_.Status -ne 'Running' })
+if ($stopped.Count -gt 0) {
+  foreach ($s in $stopped) { Write-Host '  starting service' $s.Name; Start-Service $s.Name }
+  Start-Sleep -Seconds 6
+}
+if (Probe 'http://127.0.0.1:8085/') { OK 'Techno web 8085 responds' } else { BAD '8085 not responding' }
+$apiOk = $false
+try { $code = &amp; curl.exe -s -o NUL -w '%{http_code}' -m 5 'http://127.0.0.1:3005/api/v1/health/' 2&gt;$null; $apiOk = ("$code" -eq '200') } catch {}
+if ($apiOk) { OK 'Techno API 3005 responds' } else { BAD 'API 3005 not responding - run: powershell -File C:\rose-attendance\repair-roseapi.ps1 -Fix' }
+
+Step '3/4 Rose Center (port 8083, manual python app)'
+if (Probe 'http://127.0.0.1:8083/api/health') {
+  OK 'Rose Center already running'
+} else {
+  Get-NetTCPConnection -LocalPort 8083 -State Listen -ErrorAction SilentlyContinue |
+    ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+  $env:PORT = '8083'
+  Start-Process python -ArgumentList 'app.py' -WorkingDirectory 'C:\rosecenter-deploy' -WindowStyle Hidden
+  Start-Sleep -Seconds 6
+  if (Probe 'http://127.0.0.1:8083/api/health') { OK 'Rose Center up on 8083' } else { BAD 'Rose Center not up - see C:\rosecenter-deploy\rosecenter.err.log' }
+}
+
+Step '4/4 Rosepsy (port 80, services rosepsy-*)'
+$psvc = Get-Service rosepsy-api,rosepsy-caddy -ErrorAction SilentlyContinue
+$stopped = @($psvc | Where-Object { $_.Status -ne 'Running' })
+if ($stopped.Count -gt 0) {
+  foreach ($s in $stopped) { try { Start-Service $s.Name -ErrorAction Stop } catch { BAD ('service ' + $s.Name + ': ' + $_.Exception.Message) } }
+  Start-Sleep -Seconds 6
+}
+if (Probe 'http://127.0.0.1/') { OK 'Rosepsy web responds on 80' } else { BAD 'Rosepsy not responding - see: C:\rosepsy\app\deploy\rosepsy-server-native.ps1 -Mode status' }
+
+Step 'FINAL CHECK - all systems'
+$targets = @(
+  @('Rose Hub    8082', 'http://127.0.0.1:8082/api/health'),
+  @('Techno      8085', 'http://127.0.0.1:8085/'),
+  @('Rose Center 8083', 'http://127.0.0.1:8083/api/health'),
+  @('Rosepsy       80', 'http://127.0.0.1/')
+)
+foreach ($t in $targets) { if (Probe $t[1]) { OK $t[0] } else { BAD $t[0] } }
+Write-Host ''
+Write-Host 'Done. Addresses: 8082 Rose Hub | 8083 Rose Center | 8085 Techno | 80 Rosepsy'
+'@
+[System.IO.File]::WriteAllText('C:\start-all-rose.ps1', $ps, (New-Object System.Text.UTF8Encoding($false)))
+if (Test-Path 'C:\start-all-rose.ps1') { Write-Host 'OK - file created: C:\start-all-rose.ps1' -ForegroundColor Green }</code></pre></figure>
+  </div></div>
+
+  <div class="step"><div class="n">۲</div><div class="b">
+    <h4>هر بار بعد از ری‌استارت سرور — فقط این یک دستور</h4>
+    <p>بعد از اینکه با RDP وارد سرور شدید، در PowerShell اجرا کنید (حتی بدون Run as Administrator هم کار می‌کند، اما Administrator توصیه می‌شود):</p>
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— راه‌اندازی همهٔ سامانه‌ها</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>powershell -ExecutionPolicy Bypass -File C:\start-all-rose.ps1</code></pre></figure>
+    <p>در پایان، جدول وضعیت هر چهار سامانه چاپ می‌شود؛ هر ردیفی که <code class="i">[OK]</code> نداشت را با راهنمای همین فایل پیگیری کنید.</p>
+  </div></div>
+
+  <div class="box warn"><b class="t">نکتهٔ مهم دربارهٔ PM2 و رز هاب</b>
+  PM2 روی ویندوز تا وقتی که یک کاربر با RDP وارد سرور نشده اجرا نمی‌شود. یعنی بعد از ری‌استارت سرور، اول وارد سرور شوید (حتی یک ورود کوتاه) و سپس اسکریپت بالا را اجرا کنید. اجرای <code class="i">pm2 save</code> هم بعد از هر تغییر مهم فراموش نشود تا فهرست برنامه‌های ذخیره‌شده به‌روز بماند.</div>
+
+  <h3>روش دستی (اگر خواستید هر سامانه را جدا راه بیندازید)</h3>
+  <details><summary>رز هاب و بات بله — PM2</summary><div class="inner">
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— رز هاب دستی</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>cd C:\RoseHub
+pm2 status              # وضعیت فعلی (rose-hub و rose-bale-bot باید online باشند)
+pm2 resurrect           # بازیابی برنامه‌های ذخیره‌شده
+# اگر باز هم بالا نیامد:
+pm2 start ecosystem.config.js
+pm2 save</code></pre></figure>
+    <p>بررسی سلامت: <code class="i">http://127.0.0.1:8082/api/health</code> — و برای بات بله: <code class="i">pm2 logs rose-bale-bot</code></p>
+  </div></details>
+
+  <details><summary>تکنورز — سرویس‌های ویندوزی</summary><div class="inner">
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— تکنورز دستی</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>Get-Service Rose* | Format-Table Name,Status,StartType -AutoSize
+
+# هر سرویسی که Running نبود را روشن کن:
+Get-Service RoseApi,RoseNginx,RoseWorker,RoseBeat,RoseRedis |
+  Where-Object { $_.Status -ne 'Running' } | Start-Service
+
+# وضعیت کامل با اسکریپت رسمی سامانه:
+powershell -ExecutionPolicy Bypass -File C:\rose-attendance\run-rose.ps1 -Status</code></pre></figure>
+  </div></details>
+
+  <details><summary>رز سنتر — برنامهٔ دستی (مهم‌ترین مورد پس از ری‌استارت)</summary><div class="inner">
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— اجرای رز سنتر روی 8083</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>$env:PORT = "8083"
+Start-Process python -ArgumentList "app.py" -WorkingDirectory C:\rosecenter-deploy -WindowStyle Hidden
+
+# بررسی سلامت (کد 200 یعنی سالم):
+Invoke-WebRequest http://127.0.0.1:8083/api/health -UseBasicParsing</code></pre></figure>
+    <p>اگر بالا نیامد، لاگ را ببینید: <code class="i">Get-Content C:\rosecenter-deploy\rosecenter.err.log -Tail 40</code></p>
+  </div></details>
+
+  <details><summary>رز سای — سرویس‌های rosepsy-*</summary><div class="inner">
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— رز سای دستی</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>Get-Service rosepsy-* | Format-Table Name,Status,StartType -AutoSize
+
+# اگر خاموش بودند:
+Start-Service rosepsy-api,rosepsy-caddy
+
+# گزارش وضعیت کامل با اسکریپت رسمی:
+powershell -ExecutionPolicy Bypass -File C:\rosepsy\app\deploy\rosepsy-server-native.ps1 -Mode status</code></pre></figure>
+  </div></details>
+
+  <h3>(اختیاری) خودکار کردن اجرای رز سنتر بعد از هر ری‌استارت</h3>
+  <p>چون رز سنتر سرویس ویندوزی ندارد، یک Task زمان‌بندی می‌سازیم که با ورود کاربر به سرور خودش اجرا شود. فقط یک‌بار اجرا کنید:</p>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— ساخت Task خودکار برای رز سنتر (یک‌بار)</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>$action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument '/c set PORT=8083&amp;&amp; cd /d C:\rosecenter-deploy &amp;&amp; start "rosecenter" /min python app.py'
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+Register-ScheduledTask -TaskName 'RoseCenter-AutoStart' -Action $action -Trigger $trigger -RunLevel Highest -Force
+Write-Host 'OK - RoseCenter will start automatically at logon' -ForegroundColor Green</code></pre></figure>
+  <p>برای حذف آن: <code class="i">Unregister-ScheduledTask -TaskName 'RoseCenter-AutoStart' -Confirm:$false</code></p>
+</section>

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>راهنمای مدیریت سامانه‌های رز — سرور 130.185.73.157</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+<style>
+:root{
+  --rose:#be1e5b;--rose-d:#8f1c4a;--rose-dd:#4a0e2e;
+  --ink:#331722;--mut:#93707e;--bg:#faf6f8;--card:#fff;
+  --line:#f1dde5;
+  --warn-bg:#fff8e8;--warn-bd:#f0c14b;--warn-t:#7a5b10;
+  --tip-bg:#eef6ff;--tip-bd:#86b9f2;--tip-t:#1e4f80;
+  --dng-bg:#fdeef2;--dng-bd:#ef8aa4;--dng-t:#8f1c3a;
+  --code-bg:#22262f;--code-ink:#e7ecf4;--cmt:#8b96a8;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:80px}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:Vazirmatn,'Segoe UI',Tahoma,Arial,sans-serif;
+  font-size:15px;line-height:2}
+.wrap{max-width:980px;margin:0 auto;padding:0 20px}
+
+/* ---------- hero ---------- */
+.hero{background:radial-gradient(1200px 500px at 80% -10%,rgba(255,255,255,.14),transparent 60%),linear-gradient(135deg,#3d0b26,#7a1238 55%,#be1e5b);color:#fff;padding:46px 22px 34px;text-align:center}
+.hero h1{margin:0 0 10px;font-size:30px;font-weight:800}
+.hero .sub{margin:0 auto;max-width:760px;color:#f3d9e4;font-size:15px}
+.badges{margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.badge{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);padding:3px 14px;border-radius:99px;font-size:12.5px}
+.badge.b-red{background:#fff;color:#8f1c4a;font-weight:800}
+
+/* ---------- nav ---------- */
+.topnav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.97);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);box-shadow:0 2px 14px rgba(122,18,56,.06)}
+.topnav .wrap{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:9px 20px}
+.topnav a{white-space:nowrap;text-decoration:none;color:var(--rose-d);font-size:13.5px;font-weight:600;padding:5px 13px;border-radius:99px}
+.topnav a:hover{background:#fbe9f1}
+.topnav a.hub{margin-inline-start:auto;color:#fff;background:var(--rose)}
+.topnav a.hub:hover{background:#d42d6e}
+
+/* ---------- layout ---------- */
+main{padding:28px 0 60px}
+section.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:30px 30px 24px;margin:0 0 28px;box-shadow:0 6px 24px rgba(122,18,56,.05)}
+h2{display:flex;align-items:center;gap:12px;font-size:21px;margin:0 0 6px;color:var(--rose-dd)}
+h2 .num{flex:none;width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--rose),var(--rose-d));color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;box-shadow:0 4px 10px rgba(190,30,91,.35)}
+.lead{color:#6d4453;margin:2px 0 16px;font-size:14.5px}
+h3{font-size:16.5px;color:var(--rose-d);margin:26px 0 8px;display:flex;gap:8px;align-items:center}
+h3::before{content:'';width:9px;height:9px;border-radius:3px;background:var(--rose);flex:none}
+h4{margin:14px 0 4px;font-size:15.5px;color:var(--rose-dd)}
+p{margin:8px 0}
+code.i{background:#fbe9f1;color:#8f1c4a;border-radius:6px;padding:1px 7px;font-size:12.5px;direction:ltr;unicode-bidi:embed;font-family:Consolas,'Courier New',monospace}
+
+/* ---------- command block ---------- */
+figure.cmd{margin:14px 0 20px;border-radius:12px;overflow:hidden;border:1px solid #323744;box-shadow:0 8px 20px rgba(34,38,47,.16)}
+figure.cmd figcaption{display:flex;align-items:center;gap:10px;background:#191d25;color:#aab4c6;padding:8px 14px;font-size:12px}
+figure.cmd .lang{font-weight:700;color:#d7deea}
+figure.cmd .lang i{font-style:normal;color:#67748a}
+figure.cmd .copy{margin-inline-start:auto;background:var(--rose);border:0;color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;padding:5px 16px;border-radius:99px;cursor:pointer}
+figure.cmd .copy:hover{background:#d42d6e}
+figure.cmd .copy.done{background:#0d8a5f}
+figure.cmd pre{margin:0;background:var(--code-bg);padding:16px 18px;overflow-x:auto}
+figure.cmd pre code{direction:ltr;text-align:left;display:block;font-family:Consolas,'Cascadia Mono','Courier New',monospace;font-size:13px;line-height:1.8;color:var(--code-ink);white-space:pre}
+pre code .cmt{color:var(--cmt)}
+
+/* ---------- boxes ---------- */
+.box{border-radius:12px;padding:13px 16px;margin:14px 0;font-size:14px;border:1px solid;line-height:1.95}
+.box b.t{display:block;margin-bottom:2px}
+.warn{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--warn-t)}
+.tip{background:var(--tip-bg);border-color:var(--tip-bd);color:var(--tip-t)}
+.dng{background:var(--dng-bg);border-color:var(--dng-bd);color:var(--dng-t)}
+.okb{background:#e9f9f1;border-color:#9fe3c6;color:#0d6e4d}
+
+/* ---------- tables ---------- */
+.tblwrap{overflow-x:auto;margin:14px 0;border:1px solid var(--line);border-radius:12px}
+table.tbl{width:100%;border-collapse:collapse;font-size:13.5px;min-width:680px;background:#fff}
+.tbl th{background:#fdf1f6;color:var(--rose-d);text-align:right;padding:10px 12px;font-size:12.5px;border-bottom:2px solid #f3cddd;white-space:nowrap}
+.tbl td{padding:9px 12px;border-bottom:1px solid #f7e9ef;vertical-align:top}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr:nth-child(even) td{background:#fdf8fa}
+.tbl td.ltr{direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:12px;color:#514049;white-space:nowrap}
+.tbl td b{color:var(--rose-dd)}
+
+/* ---------- steps ---------- */
+.step{display:flex;gap:14px;margin:18px 0}
+.step .n{flex:none;width:34px;height:34px;border-radius:50%;background:#fbe9f1;color:var(--rose-d);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid #f3cddd;margin-top:4px}
+.step .b{flex:1;min-width:0}
+.step h4{margin:2px 0 4px}
+
+/* ---------- details ---------- */
+details{border:1px solid var(--line);border-radius:12px;padding:0;margin:14px 0;background:#fffdfb}
+details summary{cursor:pointer;padding:12px 16px;font-weight:700;color:var(--rose-d);font-size:14px;list-style:none;position:relative;user-select:none}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:'+';position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:19px;color:var(--rose)}
+details[open] summary::after{content:'−'}
+details .inner{padding:2px 18px 16px;border-top:1px dashed var(--line)}
+details .inner p:first-child{margin-top:8px}
+
+/* ---------- SSO flow ---------- */
+ol.flow{counter-reset:f;list-style:none;margin:14px 0;padding:0}
+ol.flow li{counter-increment:f;position:relative;padding:0 44px 16px 0}
+ol.flow li::before{content:counter(f);position:absolute;right:0;top:4px;width:28px;height:28px;border-radius:9px;background:var(--rose);color:#fff;font-weight:800;font-size:13.5px;display:flex;align-items:center;justify-content:center}
+ol.flow li::after{content:'';position:absolute;right:13.5px;top:36px;bottom:2px;width:2px;background:#f3cddd}
+ol.flow li:last-child::after{display:none}
+ol.flow b{color:var(--rose-dd)}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.chip{background:#fbe9f1;border:1px solid #f3cddd;color:var(--rose-d);border-radius:99px;padding:2px 12px;font-size:12.5px;font-weight:600}
+
+footer{background:var(--rose-dd);color:#e9c3d4;text-align:center;padding:22px 16px;font-size:13px;line-height:2}
+footer b{color:#fff}
+
+@media (max-width:640px){
+  .hero h1{font-size:23px}
+  section.card{padding:20px 16px}
+  h2{font-size:18px}
+}
+@media print{
+  .topnav,.copy{display:none!important}
+  body{background:#fff}
+  section.card{box-shadow:none;break-inside:avoid}
+  .hero{-webkit-print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap">
+    <h1>راهنمای مدیریت سامانه‌های رز</h1>
+    <p class="sub">دفترچهٔ دستورات آماده برای سرور <b dir="ltr">130.185.73.157</b> — ریست رمز ادمین، راه‌اندازی پس از خاموش و روشن شدن سرور، نقشهٔ کامل سامانه‌ها و دستورات کاربردی PowerShell</p>
+    <div class="badges">
+      <span class="badge b-red">محرمانه — فقط مدیر سامانه</span>
+      <span class="badge">نسخهٔ ۱٫۰</span>
+      <span class="badge">۱۳ آبان ۱۴۰۵</span>
+      <span class="badge">رز هاب · رز سای · رز سنتر · تکنورز</span>
+    </div>
+  </div>
+</div>
+
+<nav class="topnav"><div class="wrap">
+  <a href="#s1">۱ · ریست رمز ادمین</a>
+  <a href="#s2">۲ · راه‌اندازی پس از ری‌استارت</a>
+  <a href="#s3">۳ · نقشهٔ کامل سامانه</a>
+  <a href="#s4">۴ · دستورات کاربردی</a>
+  <a class="hub" href="http://130.185.73.157:8082" target="_blank" rel="noopener">باز کردن رز هاب</a>
+</div></nav>
+
+<main>
+<div class="wrap">
+
+<!-- ============================================================ -->
+<section class="card" id="s1">
+  <h2><span class="num">۱</span> ریست رمز عبور ادمین رز هاب</h2>
+  <p class="lead">وقتی رمز مدیر فراموش شد، با سه گام زیر رمز را از داخل سرور عوض کنید — بدون نیاز به نصب چیزی.</p>
+
+  <p>رمز همهٔ حساب‌های رز هاب داخل دیتابیس <code class="i">C:\RoseHub\db\custom.db</code> با همان الگوریتم خود برنامه (scrypt) ذخیره می‌شود؛ پس ابزار ریست باید دقیقاً همان الگوریتم را بسازد. ابزار زیر همین‌کار را می‌کند و از Node.js که خود رز هاب با آن اجرا می‌شود استفاده می‌کند.</p>
+
+  <div class="box tip"><b class="t">خلاصهٔ سه‌گامی</b>
+  گام ۱ ساخت ابزار (فقط یک‌بار) ← گام ۲ دیدن فهرست حساب‌ها ← گام ۳ ثبت رمز جدید. بعد از آن ورود از همین آدرس: <code class="i">http://130.185.73.157:8082/login</code></div>
+
+  <div class="step"><div class="n">۱</div><div class="b">
+    <h4>ساخت ابزار ریست — فقط یک‌بار</h4>
+    <p>PowerShell را با <b>Run as Administrator</b> باز کنید، کل بلوک زیر را کپی، Paste و Enter بزنید تا فایل <code class="i">reset-admin.js</code> در پوشهٔ رز هاب ساخته شود:</p>
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— ساخت ابزار (یک‌بار برای همیشه)</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>$js = @'
+@@RESET_JS@@
+'@
+[System.IO.File]::WriteAllText('C:\RoseHub\reset-admin.js', $js, (New-Object System.Text.UTF8Encoding($false)))
+if (Test-Path 'C:\RoseHub\reset-admin.js') { Write-Host 'OK - file created: C:\RoseHub\reset-admin.js' -ForegroundColor Green }
+else { Write-Host 'FAILED - make sure the folder C:\RoseHub exists' -ForegroundColor Red }</code></pre></figure>
+    <div class="box okb"><b class="t">میان‌بر</b> فایل آمادهٔ <code class="i">reset-admin.js</code> هم جداگانه کنار همین راهنما تحویل داده شده است. اگر آن فایل را دارید، کافی است آن را در <code class="i">C:\RoseHub</code> کپی کنید و این گام را رد کنید.</div>
+  </div></div>
+
+  <div class="step"><div class="n">۲</div><div class="b">
+    <h4>دیدن فهرست حساب‌ها (اختیاری اما توصیه‌شده)</h4>
+    <p>فهرست همهٔ کاربران چاپ می‌شود؛ مدیران کل با عبارت <code class="i">[ADMIN]</code> مشخص می‌شوند. حساب مدیر کل پیش‌فرض: <code class="i">admin@rose.ir</code></p>
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— فهرست کاربران</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>cd C:\RoseHub
+node reset-admin.js</code></pre></figure>
+  </div></div>
+
+  <div class="step"><div class="n">۳</div><div class="b">
+    <h4>ثبت رمز جدید</h4>
+    <p>رمز دلخواه خود را داخل گیومه بگذارید و اجرا کنید. اگر فقط یک مدیر کل وجود دارد، همین دستور کافی است:</p>
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— ریست رمز مدیر کل</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>cd C:\RoseHub
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
+node reset-admin.js "New-Strong-Password-2026"</code></pre></figure>
+    <p>اگر چند مدیر دارید یا می‌خواهید حساب مشخصی را عوض کنید، ایمیل (یا کد ملی) را هم بدهید:</p>
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— ریست رمز یک حساب مشخص</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>node reset-admin.js "New-Strong-Password-2026" admin@rose.ir</code></pre></figure>
+    <p>خروجی، ایمیل/نام کاربری و رمز جدید را نشان می‌دهد و وضعیت حساب هم به <code class="i">ACTIVE</code> برمی‌گردد. سپس در صفحهٔ ورود رز هاب با همان ایمیل (یا کد ملی) و رمز جدید وارد شوید.</p>
+    <div class="box warn"><b class="t">هشدار امنیتی</b>
+    رمز را همان لحظه در جای امنی ذخیره کنید. دستور تایپ‌شده در تاریخچهٔ PowerShell هم می‌ماند؛ روی رایانه‌های اشتراکی بعد از کار دستور <code class="i">Clear-History</code> را اجرا کنید. برای رمز از ترکیب حرف بزرگ و کوچک انگلیسی، عدد و نماد استفاده کنید (مثال: <code class="i">Rose@2026!Admin</code>).</div>
+  </div></div>
+
+  <div class="step"><div class="n">۴</div><div class="b">
+    <h4>(اختیاری) خروج اجباری همهٔ نشست‌ها</h4>
+    <p>اگر احتمال می‌دهید کسی با نشستِ باز به پنل دسترسی دارد، با یک دستور همهٔ نشست‌های فعال (همهٔ دستگاه‌های همهٔ کاربران) باطل می‌شوند و باید دوباره وارد شوند:</p>
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— باطل کردن همهٔ نشست‌ها</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>cd C:\RoseHub
+node reset-admin.js --logout-all</code></pre></figure>
+    <p>ترکیب هر دو کار در یک اجرا: <code class="i">node reset-admin.js "New-Strong-Password-2026" --logout-all</code></p>
+  </div></div>
+
+  <h3>عیب‌یابی همین بخش</h3>
+  <details><summary>خطاهای رایج هنگام ریست رمز و راه‌حل</summary><div class="inner">
+    <p><b>«node is not recognized»</b> — یعنی Node.js در مسیر این پنجرهٔ PowerShell نیست. این دستور را بزنید و دوباره تلاش کنید:</p>
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— تازه‌سازی PATH</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')</code></pre></figure>
+    <p><b>«Cannot find module '@prisma/client'»</b> — باید از داخل پوشهٔ رز هاب اجرا کنید؛ اول <code class="i">cd C:\RoseHub</code> را بزنید.</p>
+    <p><b>«ERROR: no SUPER_ADMIN found»</b> — اول با <code class="i">node reset-admin.js</code> فهرست را ببینید و ایمیل مدیر را به‌عنوان پارامتر دوم بدهید.</p>
+    <p><b>خطای دیتابیس یا دیتابیس خالی</b> — مسیر دیتابیس را چک کنید؛ خروجی باید <code class="i">DATABASE_URL=file:../db/custom.db</code> باشد:</p>
+    <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— بررسی مسیر دیتابیس</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>Get-Content C:\RoseHub\.env
+Get-Item C:\RoseHub\db\custom.db | Select-Object FullName,Length,LastWriteTime</code></pre></figure>
+  </div></details>
+
+  <h3>ریست رمز ادمین سامانهٔ تکنورز (پنل 8085)</h3>
+  <p>برای تکنورز اسکریپت آماده روی سرور موجود است (پیش‌نیاز: سرویس‌های تکنورز به‌خصوص PostgreSQL بالا باشند — اگر نیستند اول بخش ۲ را اجرا کنید):</p>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— ریست رمز ادمین تکنورز</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code># رمز دلخواه:
+powershell -ExecutionPolicy Bypass -File C:\rose-attendance\reset-admin-password.ps1 -NewPassword "New-Strong-Password-2026"
+
+# یا تولید رمز تصادفی قوی (خودش چاپ می‌کند):
+powershell -ExecutionPolicy Bypass -File C:\rose-attendance\reset-admin-password.ps1</code></pre></figure>
+  <p>نشانی پنل مدیریت تکنورز: <code class="i">http://130.185.73.157:8085/admin/</code> — نام کاربری پیش‌فرض <code class="i">admin</code> است.</p>
+</section>

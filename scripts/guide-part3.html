@@ -1,0 +1,235 @@
+<!-- ============================================================ -->
+<section class="card" id="s3">
+  <h2><span class="num">۳</span> نقشهٔ کامل سامانه‌ها — روند کار و معماری</h2>
+  <p class="lead">این بخش مرجع کامل مجموعه است: چه چیزی کجاست، چه پورتی چه می‌کند و ورود یکپارچه (SSO) چطور کار می‌کند.</p>
+
+  <h3>معماری کلی در یک نگاه</h3>
+  <p>مجموعه از چهار سامانه روی یک سرور ویندوزی تشکیل شده است. <b>رز هاب</b> قلب مجموعه است: همهٔ کاربران فقط یک‌بار در رز هاب وارد می‌شوند و از داخل آن با یک کلیک به بقیهٔ سامانه‌ها می‌روند، بدون اینکه دوباره نام کاربری و رمز بزنند (ورود یکپارچه — SSO). هویت کاربر با یک توکن امضاشدهٔ ۵ دقیقه‌ای به سامانهٔ مقصد منتقل می‌شود و سامانهٔ مقصد با کلید اختصاصی خودش صحت آن را تأیید می‌کند.</p>
+
+  <h3>جدول سامانه‌ها</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>سامانه</th><th>آدرس</th><th>تکنولوژی</th><th>مسیر روی سرور</th><th>مخزن GitHub</th><th>نوع اجرا</th><th>دیتابیس</th></tr>
+    <tr><td><b>رز هاب</b><br>(درگاه مرکزی)</td><td class="ltr">130.185.73.157:8082</td><td>Next.js + Prisma</td><td class="ltr">C:\RoseHub</td><td class="ltr">sjalilvand/sso_rose</td><td>PM2 — اپ‌های <code class="i">rose-hub</code> و <code class="i">rose-bale-bot</code></td><td>SQLite<br><code class="i">db\custom.db</code></td></tr>
+    <tr><td><b>رز سای</b><br>(روان‌سنجی)</td><td class="ltr">130.185.73.157 (80 و 443)</td><td>FastAPI + React + Caddy</td><td class="ltr">C:\rosepsy</td><td class="ltr">sjalilvand/special-spoon</td><td>سرویس‌های ویندوزی <code class="i">rosepsy-api</code> / <code class="i">rosepsy-caddy</code> / <code class="i">rosepsy-pg</code> / Redis</td><td>PostgreSQL</td></tr>
+    <tr><td><b>رز سنتر</b></td><td class="ltr">130.185.73.157:8083</td><td>Flask</td><td class="ltr">C:\rosecenter-deploy</td><td class="ltr">sjalilvand/rosecenter</td><td>بدون سرویس — اجرای دستی <code class="i">python app.py</code></td><td>SQLite<br><code class="i">rose.db</code></td></tr>
+    <tr><td><b>تکنورز</b><br>(حضور و غیاب)</td><td class="ltr">130.185.73.157:8085</td><td>Django + Daphne + nginx + React</td><td class="ltr">C:\rose-attendance</td><td class="ltr">sjalilvand/rose-attendance</td><td>سرویس‌های ویندوزی <code class="i">RoseApi</code> / <code class="i">RoseNginx</code> / <code class="i">RoseWorker</code> / <code class="i">RoseBeat</code> / <code class="i">RoseRedis</code></td><td>PostgreSQL</td></tr>
+  </table></div>
+
+  <h3>پورت‌های داخلی مهم</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>پورت</th><th>سرویس</th><th>توضیح</th></tr>
+    <tr><td class="ltr">80 / 443</td><td>Caddy (رز سای)</td><td>وب و API رز سای — تنها پورت‌های عمومی رز سای</td></tr>
+    <tr><td class="ltr">3005</td><td>Daphne (تکنورز)</td><td>بک‌اند API تکنورز؛ nginx روی 8085 به آن پروکسی می‌کند</td></tr>
+    <tr><td class="ltr">8000</td><td>Uvicorn (رز سای)</td><td>API داخلی رز سای — فقط از داخل سرور (127.0.0.1)</td></tr>
+    <tr><td class="ltr">5432</td><td>PostgreSQL</td><td>دیتابیس رز سای (rosepsy-pg) و دیتابیس تکنورز (RosePostgres)</td></tr>
+    <tr><td class="ltr">6379</td><td>Redis</td><td>صف Celery تکنورز (RoseRedis) و کش رز سای</td></tr>
+    <tr><td class="ltr">8082 / 8083 / 8085</td><td>وب رز هاب / رز سنتر / تکنورز</td><td>پورت‌های عمومی سامانه‌ها</td></tr>
+  </table></div>
+
+  <h3>جریان ورود یکپارچه (SSO) قدم‌به‌قدم</h3>
+  <ol class="flow">
+    <li><b>ورود به رز هاب:</b> کاربر در <code class="i">130.185.73.157:8082/login</code> با ایمیل یا کد ملی و رمز وارد می‌شود و کوکی نشست می‌گیرد.</li>
+    <li><b>انتخاب سامانه:</b> در کارت «سامانه‌ها» روی رز سای، رز سنتر یا تکنورز کلیک می‌کند (فقط سامانه‌هایی که مدیر برای او مجوز کرده).</li>
+    <li><b>صدور توکن:</b> رز هاب برای آن سامانه یک توکن JWT با کلید اختصاصی همان سامانه امضا می‌کند؛ اعتبارش فقط ۵ دقیقه است و مشخصات کاربر (نام، کد ملی، موبایل، استان، کلینیک و...) داخل آن است.</li>
+    <li><b>انتقال:</b> مرورگر به نشانی مخصوص سامانهٔ مقصد با همان توکن هدایت می‌شود.</li>
+    <li><b>اعتبارسنجی:</b> سامانهٔ مقصد توکن را با کلید خودش بررسی می‌کند؛ اگر کاربر را نمی‌شناسد می‌سازد، اگر می‌شناسد پروفایلش را به‌روز می‌کند و نشست محلی می‌دهد.</li>
+    <li><b>ورود مستقیم:</b> از آن به بعد همان کاربر بدون رمز در سامانهٔ مقصد است. دکمهٔ «ورود یکپارچه با رز هاب» در صفحهٔ ورود هر سه سامانه هم به آدرس 8082 برمی‌گردد.</li>
+  </ol>
+
+  <p>شناسهٔ اتصال هر سامانه (clientId) برای پیگیری مشکلات SSO:</p>
+  <div class="chips">
+    <span class="chip">رز سای → rose-psy-5c3f9b</span>
+    <span class="chip">رز سنتر → rose-center-2e8a5c</span>
+    <span class="chip">تکنورز → rose-techno-8a4e1f</span>
+  </div>
+  <div class="box dng"><b class="t">محرمانه</b>
+  کلید اتصال هر سامانه (clientSecret) در رکورد همان سامانه داخل دیتابیس رز هاب نگه‌داری می‌شود و نباید در گروه‌ها یا فایل‌های عمومی نوشته شود.</div>
+
+  <h3>کاربران، نقش‌ها و ثبت‌نام</h3>
+  <p>ورود با <b>ایمیل یا کد ملی</b> + رمز انجام می‌شود. نقش‌ها از بالاتر به پایین‌تر: مدیر کل (SUPER_ADMIN)، مدیر واحد، درمانگر، پذیرش/پشتیبان، مدرس و کاربر بیرونی. حساب مدیر کل پیش‌فرض <code class="i">admin@rose.ir</code> است (رمز اولیهٔ نصب: <code class="i">rose1234</code> — اگر عوض شده، با بخش ۱ همین راهنما بازنشانی کنید).</p>
+  <p><b>ثبت‌نام کاربران جدید:</b> کسی که حساب ندارد از صفحهٔ <code class="i">/register</code> درخواست می‌دهد (نام، کد ملی، موبایل، رمز). درخواست با وضعیت PENDING در پنل مدیر می‌نشیند؛ تا زمانی که مدیر آن را تأیید نکند هیچ حسابی ساخته نمی‌شود و کاربر اجازهٔ ورود ندارد. پس از تأیید، حساب با کد ملی به‌عنوان نام کاربری ساخته می‌شود. مدیر همچنین تعیین می‌کند هر کاربر به کدام سامانه‌ها دسترسی داشته باشد.</p>
+
+  <h3>بات بله — @rosepro_bot</h3>
+  <p>بات پشتیبانی رز هاب در پیام‌رسان بله به نشانی <code class="i">ble.ir/rosepro_bot</code> سه کار می‌کند: <b>اتصال حساب</b> (با کد ملی و ۴ رقم آخر موبایل)، <b>فراموشی رمز عبور</b> (کد ۶ رقمی + پیوند یک‌بارمصرف تغییر رمز که ۱۵ دقیقه اعتبار دارد) و <b>پشتیبانی</b> (پیام کاربر مستقیم در پنل مدیر ثبت و اعلان می‌شود). بات برای کاربران عادی است؛ رمز خود مدیر با بخش ۱ همین راهنما ریست می‌شود.</p>
+  <p>بات داخل همان PM2 با نام اپ <code class="i">rose-bale-bot</code> اجرا می‌شود و توکن آن در فایل <code class="i">C:\RoseHub\ecosystem.config.js</code> است. مدیریت:</p>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— مدیریت بات بله</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>pm2 status rose-bale-bot
+pm2 logs rose-bale-bot --lines 50
+pm2 restart rose-bale-bot</code></pre></figure>
+
+  <h3>فایل‌ها و مسیرهای کلیدی</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>مسیر</th><th>توضیح</th></tr>
+    <tr><td class="ltr">C:\RoseHub</td><td>برنامهٔ رز هاب — شامل <code class="i">.env</code>، <code class="i">ecosystem.config.js</code>، <code class="i">reset-admin.js</code></td></tr>
+    <tr><td class="ltr">C:\RoseHub\db\custom.db</td><td><b>مهم‌ترین فایل مجموعه</b> — دیتابیس کاربران، نشست‌ها، سامانه‌ها و اطلاعیه‌های رز هاب</td></tr>
+    <tr><td class="ltr">C:\RoseHub\ecosystem.config.js</td><td>پیکربندی PM2 (رز هاب + بات بله و توکن بات)</td></tr>
+    <tr><td class="ltr">C:\rose-attendance</td><td>تکنورز — به‌همراه <code class="i">run-rose.ps1</code>، <code class="i">repair-roseapi.ps1</code>، <code class="i">reset-admin-password.ps1</code></td></tr>
+    <tr><td class="ltr">C:\rose-stack</td><td>زیرساخت تکنورز — venv پایتون، <code class="i">rose-backend.env</code>، ابزار سرویس‌ها (WinSW)</td></tr>
+    <tr><td class="ltr">C:\rosepsy</td><td>رز سای — اسکریپت مدیریتی: <code class="i">app\deploy\rosepsy-server-native.ps1</code></td></tr>
+    <tr><td class="ltr">C:\rosecenter-deploy</td><td>رز سنتر — <code class="i">rose.db</code> و لاگ‌های <code class="i">rosecenter.out.log</code> / <code class="i">rosecenter.err.log</code></td></tr>
+  </table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="card" id="s4">
+  <h2><span class="num">۴</span> دستورات کاربردی و مهم روزمره</h2>
+  <p class="lead">همهٔ دستورات را کپی کنید و در PowerShell سرور اجرا کنید — هیچ نیازی به حفظ کردن نیست.</p>
+
+  <h3>بررسی سلامت همهٔ سامانه‌ها</h3>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— تست سلامت چهار سامانه</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>function Probe($u){try{$r=Invoke-WebRequest -Uri $u -UseBasicParsing -TimeoutSec 6;Write-Host "[OK  ] $u" -ForegroundColor Green}catch{Write-Host "[FAIL] $u" -ForegroundColor Red}}
+Probe 'http://127.0.0.1:8082/api/health'      # Rose Hub
+Probe 'http://127.0.0.1:8085/'                # Techno web
+Probe 'http://127.0.0.1:8083/api/health'      # Rose Center
+Probe 'http://127.0.0.1/'                     # Rosepsy
+curl.exe -s -o NUL -w "Techno API 3005: %{http_code}`n" http://127.0.0.1:3005/api/v1/health/</code></pre></figure>
+
+  <h3>مدیریت رز هاب و بات بله با PM2</h3>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— دستورات PM2</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>pm2 status                    # وضعیت همهٔ اپ‌ها (online/errored)
+pm2 logs rose-hub             # لاگ زندهٔ رز هاب (خروج: Ctrl+C)
+pm2 logs rose-hub --lines 100 # ۱۰۰ خط آخر لاگ
+pm2 logs rose-bale-bot        # لاگ بات بله
+pm2 restart rose-hub          # ری‌استارت رز هاب
+pm2 restart rose-bale-bot     # ری‌استارت بات بله
+pm2 stop rose-hub             # توقف
+pm2 start rose-hub            # شروع دوباره
+pm2 flush                     # پاک‌سازی لاگ‌های قدیمی
+pm2 save                      # ذخیرهٔ وضعیت برای resurrect بعدی</code></pre></figure>
+
+  <h3>سرویس‌های ویندوزی (تکنورز و رز سای)</h3>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— مدیریت سرویس‌ها</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code># وضعیت:
+Get-Service Rose*     | Format-Table Name,Status,StartType -AutoSize
+Get-Service rosepsy-* | Format-Table Name,Status,StartType -AutoSize
+
+# ری‌استارت یک سرویس:
+Restart-Service RoseApi
+Restart-Service rosepsy-caddy
+
+# مدیریت کامل تکنورز با اسکریپت رسمی:
+powershell -ExecutionPolicy Bypass -File C:\rose-attendance\run-rose.ps1 -Status
+powershell -ExecutionPolicy Bypass -File C:\rose-attendance\run-rose.ps1 -Restart</code></pre></figure>
+
+  <h3>به‌روزرسانی کد از GitHub</h3>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— آپدیت رز هاب و سه سامانهٔ متصل</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code># به‌روزرسانی رز هاب (خودش دیتابیس را پشتیبان گرفته و برمی‌گرداند):
+powershell -ExecutionPolicy Bypass -File C:\update-rosehub.ps1
+
+# به‌روزرسانی رز سای + رز سنتر + تکنورز با هم:
+powershell -ExecutionPolicy Bypass -File C:\update-sso-systems.ps1 -GithubToken "ghp_توکن-جدید-شما"</code></pre></figure>
+  <div class="box tip"><b class="t">توکن گیت‌هاب منقضی می‌شود</b>
+  اگر git fetch خطا داد، توکن جدید از <code class="i">github.com/settings/tokens</code> بسازید و در همان دستور بگذارید. بعد از هر به‌روزرسانی، صفحه‌ها را با Ctrl+F5 تست کنید تا کش مرورگر باعث سردرگمی نشود.</div>
+
+  <h3>پشتیبان‌گیری و بازگردانی دیتابیس‌ها</h3>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— پشتیبان‌گیری</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code># پشتیبان دیتابیس رز هاب (با تاریخ):
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+Copy-Item C:\RoseHub\db\custom.db "C:\RoseHub\db\custom-backup-$stamp.db"
+Copy-Item C:\RoseHub\db\custom.db-wal "C:\RoseHub\db\custom-backup-$stamp.db-wal" -ErrorAction SilentlyContinue
+Copy-Item C:\RoseHub\db\custom.db-shm "C:\RoseHub\db\custom-backup-$stamp.db-shm" -ErrorAction SilentlyContinue
+Write-Host "backup created: custom-backup-$stamp.db" -ForegroundColor Green
+
+# پشتیبان دیتابیس رز سنتر:
+Copy-Item C:\rosecenter-deploy\rose.db "C:\rosecenter-deploy\rose-backup-$stamp.db"</code></pre></figure>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— بازگردانی پشتیبان رز هاب</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>cd C:\RoseHub
+pm2 stop rose-hub
+Copy-Item "C:\RoseHub\db\custom-backup-YYYYMMDD-HHMMSS.db" C:\RoseHub\db\custom.db -Force
+pm2 start rose-hub
+Invoke-WebRequest http://127.0.0.1:8082/api/health -UseBasicParsing</code></pre></figure>
+
+  <h3>پیدا کردن پروسه و آزاد کردن پورت</h3>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— پورت‌ها و پروسه‌ها</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code># همهٔ پورت‌های گوش‌دهنده:
+Get-NetTCPConnection -State Listen | Sort-Object LocalPort |
+  Format-Table LocalAddress,LocalPort,OwningProcess -AutoSize
+
+# چه پروسه‌ای پورت 8082 را گرفته؟
+Get-Process -Id (Get-NetTCPConnection -LocalPort 8082 -State Listen).OwningProcess
+
+# آزادسازی پورت اشغالی (مثال: 3005 — پروسهٔ سرگردان):
+Get-NetTCPConnection -LocalPort 3005 -State Listen |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }</code></pre></figure>
+
+  <h3>تعمیر اضطراری API تکنورز</h3>
+  <p>اگر صفحه‌های تکنورز خطای 404 یا قطع API دادند (معمولاً به‌خاطر پروسهٔ قدیمی روی پورت 3005):</p>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— تشخیص و تعمیر RoseApi</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code># فقط تشخیص (بی‌خطر):
+powershell -ExecutionPolicy Bypass -File C:\rose-attendance\repair-roseapi.ps1
+
+# تشخیص + تعمیر کامل (کشتن پروسهٔ سرگردان، مایگریشن، شروع سرویس):
+powershell -ExecutionPolicy Bypass -File C:\rose-attendance\repair-roseapi.ps1 -Fix</code></pre></figure>
+
+  <h3>فایروال ویندوز</h3>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— قوانین فایروال</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code># قوانین فعلی مجموعه رز:
+Get-NetFirewallRule -DisplayName 'Rose*' | Format-Table DisplayName,Enabled,Direction -AutoSize
+
+# باز کردن یک پورت جدید برای دسترسی عمومی (مثال):
+New-NetFirewallRule -DisplayName 'Rose Hub 8082' -Direction Inbound -Protocol TCP -LocalPort 8082 -Action Allow</code></pre></figure>
+
+  <h3>توقف کامل مجموعه (برای نگهداری یا خاموشی برنامه‌ای)</h3>
+  <div class="box warn"><b class="t">با احتیاط</b>
+  این دستورات همهٔ سامانه‌ها را قطع می‌کنند و کاربران از دسترسی خارج می‌شوند.</div>
+  <figure class="cmd"><figcaption><span class="lang">PowerShell <i>— توقف همه (Run as Administrator)</i></span><button class="copy" type="button">کپی</button></figcaption><pre><code>pm2 stop all
+Get-Service RoseApi,RoseNginx,RoseWorker,RoseBeat,RoseRedis -ErrorAction SilentlyContinue | Stop-Service
+Get-Service rosepsy-api,rosepsy-caddy -ErrorAction SilentlyContinue | Stop-Service
+Get-NetTCPConnection -LocalPort 8083 -State Listen -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }</code></pre></figure>
+
+  <h3>عیب‌یابی‌های رایج</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>مشکل</th><th>اولین کاری که باید بکنید</th></tr>
+    <tr><td>رز هاب باز نمی‌شود</td><td><code class="i">pm2 status</code> ← <code class="i">pm2 logs rose-hub --lines 50</code> ← <code class="i">pm2 restart rose-hub</code></td></tr>
+    <tr><td>بعد از به‌روزرسانی، صفحه تغییر نکرده</td><td>Ctrl+F5 برای پاک‌شدن کش مرورگر</td></tr>
+    <tr><td>«ورود از رز هاب» به یک سامانه خطا داد</td><td>سلامت آن سامانه را با بلوک «بررسی سلامت» چک کنید؛ بعد لاگ همان سامانه</td></tr>
+    <tr><td>404 روی مسیرهای api/v1 تکنورز</td><td><code class="i">repair-roseapi.ps1 -Fix</code> (کد قدیمی در حال اجراست)</td></tr>
+    <tr><td>رمز ادمین فراموش شد</td><td>بخش ۱ همین راهنما</td></tr>
+    <tr><td>رز سنتر بعد از ری‌استارت بالا نیست</td><td>بخش ۲ — رز سنتر همیشه راه‌اندازی دستی می‌خواهد</td></tr>
+    <tr><td>بعد از ری‌استارت چند سامانه بالا نیامدند</td><td><code class="i">C:\start-all-rose.ps1</code> را اجرا کنید (بخش ۲)</td></tr>
+    <tr><td>بات بله جواب نمی‌دهد</td><td><code class="i">pm2 logs rose-bale-bot --lines 50</code> ← <code class="i">pm2 restart rose-bale-bot</code></td></tr>
+    <tr><td>git fetch خطا داد هنگام آپدیت</td><td>توکن گیت‌هاب منقضی است — بخش «به‌روزرسانی کد» همین راهنما</td></tr>
+  </table></div>
+</section>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <b>راهنمای مدیریت سامانه‌های رز — سرور 130.185.73.157</b><br>
+    نسخهٔ ۱٫۰ · ۱۳ آبان ۱۴۰۵ · سند محرمانهٔ داخلی — خارج از سرور منتشر نکنید
+  </div>
+</footer>
+
+<script>
+// رنگ‌آمیزی خطوط کامنت در بلوک‌های کد
+document.querySelectorAll('pre code').forEach(function(el){
+  var lines = el.innerHTML.split('\n').map(function(line){
+    if (/^\s*(#|\/\/)/.test(line)) return '<span class="cmt">' + line + '</span>';
+    return line;
+  });
+  el.innerHTML = lines.join('\n');
+});
+
+// دکمهٔ کپی هر بلوک
+document.querySelectorAll('figure.cmd').forEach(function(block){
+  var btn = block.querySelector('.copy');
+  var code = block.querySelector('code');
+  if (!btn || !code) return;
+  btn.addEventListener('click', function(){
+    var text = code.innerText;
+    function done(){
+      btn.textContent = 'کپی شد ✓';
+      btn.classList.add('done');
+      setTimeout(function(){ btn.textContent = 'کپی'; btn.classList.remove('done'); }, 1600);
+    }
+    function fallback(){
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      try { document.execCommand('copy'); done(); }
+      catch (e) { btn.textContent = 'خطا'; }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else { fallback(); }
+  });
+});
+</script>
+</body>
+</html>
