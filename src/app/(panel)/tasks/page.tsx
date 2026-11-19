@@ -40,6 +40,7 @@ import {
   Trash2,
   AlertTriangle,
 } from "lucide-react";
+import { SearchableSelect } from "@/components/searchable-select";
 import { toast } from "sonner";
 import { formatShortJalali, faNum, jalaliToDate } from "@/lib/jalali";
 
@@ -494,19 +495,15 @@ export default function TasksPage() {
               </div>
               <div className="space-y-2">
                 <Label>مسئول اصلی</Label>
-                <Select dir="rtl" value={fAssignee || "me"} onValueChange={setFAssignee}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="me">خودم</SelectItem>
-                    {users.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.name} — {u.jobTitle || u.unit}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={fAssignee || "me"}
+                  onChange={setFAssignee}
+                  options={[
+                    { value: "me", label: "خودم" },
+                    ...users.map((u) => ({ value: u.id, label: u.name, hint: u.jobTitle || u.unit || undefined })),
+                  ]}
+                  placeholder="جستجوی کاربر…"
+                />
               </div>
             </div>
             <div className="space-y-2">

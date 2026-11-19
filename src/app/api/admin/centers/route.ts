@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
   }
 }
 
+const CENTER_TYPES = ["CENTER", "HQ", "CLINIC", "EMDAD"]; // EMDAD = کمیته امداد امام خمینی
+
 export async function POST(req: NextRequest) {
   try {
     const me = await requireAuth(req);
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
       data: {
         code,
         name,
-        type: body.type === "CENTER" || body.type === "HQ" ? body.type : "CLINIC",
+        type: CENTER_TYPES.includes(body.type || "") ? (body.type as string) : "CLINIC",
         region: (body.region || "").trim(),
         province: (body.province || "").trim(),
         city: (body.city || "").trim(),

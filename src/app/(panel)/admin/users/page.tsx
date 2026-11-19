@@ -36,6 +36,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/searchable-select";
+import { IR_PROVINCES } from "@/lib/ir-geo";
 import {
   Table,
   TableBody,
@@ -804,64 +806,49 @@ export default function AdminUsersPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>مرکز تخصیص</Label>
-                      <Select dir="rtl" value={eCenterId || "__none__"}
-                        onValueChange={(v) => setECenterId(v === "__none__" ? "" : v)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent className="max-h-60">
-                          <SelectItem value="__none__">— انتخاب نشده —</SelectItem>
-                          {centers.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}{c.province ? ` (${c.province})` : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableSelect
+                        value={eCenterId}
+                        onChange={setECenterId}
+                        options={centers.map((c) => ({ value: c.id, label: c.name, hint: c.province || undefined }))}
+                        noneLabel="— انتخاب نشده —"
+                        placeholder="جستجوی مرکز…"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>کلینک خدمت</Label>
-                      <Select dir="rtl" value={eClinicId || "__none__"}
-                        onValueChange={(v) => {
-                          const id = v === "__none__" ? "" : v;
-                          setEClinicId(id);
-                          const c = centers.find((x) => x.id === id);
-                          if (c) setEClinic(c.name); // سازگاری با سامانه‌ها — نام متنی کلینک
-                        }}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent className="max-h-60">
-                          <SelectItem value="__none__">— انتخاب نشده —</SelectItem>
-                          {centers.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}{c.province ? ` (${c.province})` : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableSelect
+                        value={eClinicId}
+                        onChange={(v) => {
+                          setEClinicId(v);
+                          const c = centers.find((x) => x.id === v);
+                          if (c) setEClinic(c.name); // سازگاری با سامانه‌ها — نام متنی کلینیک
+                        }}
+                        options={centers.map((c) => ({ value: c.id, label: c.name, hint: c.province || undefined }))}
+                        noneLabel="— انتخاب نشده —"
+                        placeholder="جستجوی کلینیک…"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>مدیریت متبوع</Label>
-                      <Select dir="rtl" value={eManagementId || "__none__"}
-                        onValueChange={(v) => setEManagementId(v === "__none__" ? "" : v)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent className="max-h-60">
-                          <SelectItem value="__none__">— انتخاب نشده —</SelectItem>
-                          {managements.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableSelect
+                        value={eManagementId}
+                        onChange={setEManagementId}
+                        options={managements.map((m) => ({ value: m.id, label: m.name }))}
+                        noneLabel="— انتخاب نشده —"
+                        placeholder="جستجوی مدیریت…"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>مدیر مستقیم (سلسله‌مراتب)</Label>
-                      <Select dir="rtl" value={eManagerId || "__none__"}
-                        onValueChange={(v) => setEManagerId(v === "__none__" ? "" : v)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent className="max-h-60">
-                          <SelectItem value="__none__">— بدون مدیر —</SelectItem>
-                          {users.filter((x) => x.id !== editing?.id).map((x) => (
-                            <SelectItem key={x.id} value={x.id}>{x.name} — {x.jobTitle || x.unit}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableSelect
+                        value={eManagerId}
+                        onChange={setEManagerId}
+                        options={users.filter((x) => x.id !== editing?.id).map((x) => ({
+                          value: x.id, label: x.name, hint: x.jobTitle || x.unit,
+                        }))}
+                        noneLabel="— بدون مدیر —"
+                        placeholder="جستجوی کاربر…"
+                      />
                     </div>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
@@ -877,7 +864,13 @@ export default function AdminUsersPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>استان</Label>
-                      <Input value={eProvince} onChange={(e) => setEProvince(e.target.value)} />
+                      <SearchableSelect
+                        value={eProvince}
+                        onChange={setEProvince}
+                        options={IR_PROVINCES.map((p) => ({ value: p, label: p }))}
+                        noneLabel="— انتخاب نشده —"
+                        placeholder="جستجوی استان…"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>مدرک تحصیلی</Label>

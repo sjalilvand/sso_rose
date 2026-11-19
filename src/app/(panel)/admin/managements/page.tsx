@@ -17,13 +17,11 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
   Network, Plus, Loader2, Pencil, Trash2, UserCog, Users, Hospital, Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { faNum } from "@/lib/jalali";
+import { SearchableSelect } from "@/components/searchable-select";
 
 /**
  * مدیریت‌های سازمانی — بند ۴
@@ -239,29 +237,23 @@ export default function AdminManagementsPage() {
             </div>
             <div className="space-y-1.5">
               <Label>مدیر این مدیریت</Label>
-              <Select dir="rtl" value={form.managerId || "__none__"} onValueChange={(v) => setForm({ ...form, managerId: v === "__none__" ? "" : v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent className="max-h-64">
-                  <SelectItem value="__none__">— بدون مدیر —</SelectItem>
-                  {users.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name}{u.jobTitle ? ` — ${u.jobTitle}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={form.managerId}
+                onChange={(v) => setForm({ ...form, managerId: v })}
+                options={users.map((u) => ({ value: u.id, label: u.name, hint: u.jobTitle || undefined }))}
+                noneLabel="— بدون مدیر —"
+                placeholder="جستجوی کاربر…"
+              />
             </div>
             <div className="space-y-1.5">
               <Label>مرکز / کلینیک مرتبط</Label>
-              <Select dir="rtl" value={form.centerId || "__none__"} onValueChange={(v) => setForm({ ...form, centerId: v === "__none__" ? "" : v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent className="max-h-64">
-                  <SelectItem value="__none__">— بدون مرکز —</SelectItem>
-                  {centers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={form.centerId}
+                onChange={(v) => setForm({ ...form, centerId: v })}
+                options={centers.map((c) => ({ value: c.id, label: c.name, hint: c.province || undefined }))}
+                noneLabel="— بدون مرکز —"
+                placeholder="جستجوی مرکز…"
+              />
             </div>
             <Button className="w-full" onClick={save} disabled={saving}>
               {saving ? <Loader2 className="size-4 animate-spin" /> : form.id ? "ذخیرهٔ تغییرات" : "ثبت مدیریت"}

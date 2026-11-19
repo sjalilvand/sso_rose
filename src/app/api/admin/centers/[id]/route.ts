@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         ...(body.code !== undefined ? { code: body.code.trim() || current.code } : {}),
         ...(body.name !== undefined ? { name: body.name.trim() } : {}),
         ...(body.type !== undefined
-          ? { type: body.type === "CENTER" || body.type === "HQ" ? body.type : "CLINIC" }
+          ? { type: ["CENTER", "HQ", "CLINIC", "EMDAD"].includes(body.type) ? body.type : "CLINIC" }
           : {}),
         ...(body.region !== undefined ? { region: body.region.trim() } : {}),
         ...(body.province !== undefined ? { province: body.province.trim() } : {}),
