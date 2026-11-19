@@ -1,0 +1,330 @@
+[
+ {
+  "sheet": "مدیران کلینیک",
+  "province": "آذربایجان غربی",
+  "name": "فرناز غنی دل تکانلو",
+  "nationalId": "2755629169",
+  "phone": "09146716366",
+  "nidValid": true
+ },
+ {
+  "sheet": "مدیران کلینیک",
+  "province": "ایلام",
+  "name": "مریم غلامی",
+  "nationalId": "3341333010",
+  "phone": "09393577756",
+  "nidValid": true
+ },
+ {
+  "sheet": "مدیران کلینیک",
+  "province": "تهران",
+  "name": "هادی پرگیر",
+  "nationalId": "0057375437",
+  "phone": "09122139752",
+  "nidValid": true
+ },
+ {
+  "sheet": "مدیران کلینیک",
+  "province": "چهارمحال و بختیاری",
+  "name": "هوشنگ مولوی چوبینی",
+  "nationalId": "4679192941",
+  "phone": "09131820759",
+  "nidValid": true
+ },
+ {
+  "sheet": "مدیران کلینیک",
+  "province": "خراسان شمالی",
+  "name": "مونا علی نژاد",
+  "nationalId": "0638962821",
+  "phone": "09331849195",
+  "nidValid": true
+ },
+ {
+  "sheet": "مدیران کلینیک",
+  "province": "زنجان",
+  "name": "خدیجه کابلی",
+  "nationalId": "4280990190",
+  "phone": "09127410158",
+  "nidValid": true
+ },
+ {
+  "sheet": "مدیران کلینیک",
+  "province": "کردستان",
+  "name": "ندا مصطفایی",
+  "nationalId": "3732913783",
+  "phone": "09184514380",
+  "nidValid": true
+ },
+ {
+  "sheet": "مدیران کلینیک",
+  "province": "کرمانشاه",
+  "name": "روناکک محمدی",
+  "nationalId": "3255971081",
+  "phone": "09183567152",
+  "nidValid": true
+ },
+ {
+  "sheet": "مدیران کلینیک",
+  "province": "همدان",
+  "name": "راحله تهمتن",
+  "nationalId": "3875405439",
+  "phone": "09184022202",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "آذربایجان شرقی",
+  "name": "پری فتحی پور",
+  "nationalId": "1376696861",
+  "phone": "09143174356",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "آذربایجان غربی",
+  "name": "هانیه پاشازاده",
+  "nationalId": "2741045682",
+  "phone": "09336798958",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "اردبیل",
+  "name": "نرگس نصرتی قنبرلو",
+  "nationalId": "1621800970",
+  "phone": "09142882214",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "اصفهان",
+  "name": "راحله اسدی آقبلاغی",
+  "nationalId": "4622155982",
+  "phone": "09134636528",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "البرز",
+  "name": "کوثر توکلی",
+  "nationalId": "0022299645",
+  "phone": "09910835312",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "ایلام",
+  "name": "فیروزه حق مرادی",
+  "nationalId": "4539750951",
+  "phone": "09187380532",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "بوشهر",
+  "name": "راضیه درازی",
+  "nationalId": "3559970555",
+  "phone": "09179730591",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "تهران",
+  "name": "زهرا عطاییان فر",
+  "nationalId": "0074411780",
+  "phone": "09192267691",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "چهارمحال و بختیاری",
+  "name": "شقایق فرهادی بابادی",
+  "nationalId": "4610786079",
+  "phone": "09020554231",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "خراسان جنوبی",
+  "name": "عصمت شفیعی",
+  "nationalId": "0640641709",
+  "phone": "09939150308",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "خراسان رضوی",
+  "name": "سارا قنبری",
+  "nationalId": "0925893455",
+  "phone": "09924353371",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "خراسان شمالی",
+  "name": "زهرا گریوانی",
+  "nationalId": "0670707368",
+  "phone": "09157760109",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "خوزستان",
+  "name": "سارا بیات",
+  "nationalId": "1756513554",
+  "phone": "09908050341",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "زنجان",
+  "name": "زهرا صفری",
+  "nationalId": "5899905948",
+  "phone": "09127428455",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "سمنان",
+  "name": "سارا غلامی سرخه",
+  "nationalId": "4569737595",
+  "phone": "09194304869",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "سیستان و بلوچستان",
+  "name": "سمیه کوثری",
+  "nationalId": "3673587031",
+  "phone": "09036560640",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "فارس",
+  "name": "محدثه رئیسی",
+  "nationalId": "2282941985",
+  "phone": "09908768240",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "فارس",
+  "name": "زینب ابراهیمی",
+  "nationalId": "6559963640",
+  "phone": "09171072516",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "قزوین",
+  "name": "نرگس گلزنی",
+  "nationalId": "4311845766",
+  "phone": "09214008027",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "قم",
+  "name": "حوا غنیمی",
+  "nationalId": "1753754501",
+  "phone": "09129339204",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "کردستان",
+  "name": "سمیه محمدی",
+  "nationalId": "3732938735",
+  "phone": "09184394048",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "کرمان",
+  "name": "مریم اکبرزاده",
+  "nationalId": "3180047984",
+  "phone": "09392928488",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "کرمانشاه",
+  "name": "راضیه محمدی",
+  "nationalId": "3258672970",
+  "phone": "09181300421",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "کهگیلویه و بویر احمد",
+  "name": "فرزانه درخواه",
+  "nationalId": "4220331263",
+  "phone": "09929604776",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "گلستان",
+  "name": "منصوره گرزین",
+  "nationalId": "2122854197",
+  "phone": "09119000469",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "گیلان",
+  "name": "زهرا فلاح رودسری",
+  "nationalId": "2581131748",
+  "phone": "09924992293",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "لرستان",
+  "name": "مرجان عربانی",
+  "nationalId": "4073023004",
+  "phone": "09363229209",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "مازندران",
+  "name": "رویا شعبانی",
+  "nationalId": "2092107119",
+  "phone": "09362067796",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "مرکزی",
+  "name": "لیلا چگینی",
+  "nationalId": "0622267043",
+  "phone": "09185287511",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "هرمزگان",
+  "name": "راضیه علیمرادی دوکوهی",
+  "nationalId": "3380392758",
+  "phone": "09172243232",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "همدان",
+  "name": "سیده بهجت موسوی",
+  "nationalId": "3932691504",
+  "phone": "09189143921",
+  "nidValid": true
+ },
+ {
+  "sheet": "مسئولین اجرایی",
+  "province": "یزد",
+  "name": "لیلا شیرمحمدی بهادران",
+  "nationalId": "4469737925",
+  "phone": "09136725518",
+  "nidValid": true
+ }
+]
