@@ -42,7 +42,7 @@ model User {
   jobTitle         String     @default("")
   phone            String     @default("")
   province         String     @default("") // استان
-  clinic           String     @default("") // کلینک محل خدمت
+  clinic           String     @default("") // کلینک محل خدمت (متن — سازگاری با سامانه‌ها)
   education        String     @default("") // مدرک تحصیلی
   workLicense      String     @default("") // پروانه اشتغال (دارد / ندارد)
   profRank         String     @default("") // رتبه حرفه‌ای
@@ -56,6 +56,20 @@ model User {
   lastLoginAt      DateTime?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
+
+  // اطلاعات پایه سازمانی — فاز ۷۲
+  centerId       String? // مرکز تخصیص — از اطلاعات پایه مراکز
+  clinicId       String? // کلینک خدمت — از اطلاعات پایه مراکز
+  managementId   String? // مدیریت متبوع
+  managerId      String? // مدیر مستقیم (سلسله‌مراتب سازمانی)
+
+  center         Center?  @relation("userCenter", fields: [centerId], references: [id], onDelete: SetNull)
+  clinicCenter   Center?  @relation("userClinic", fields: [clinicId], references: [id], onDelete: SetNull)
+  management     Management? @relation("managementMembers", fields: [managementId], references: [id], onDelete: SetNull)
+  manager        User?    @relation("orgTree", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates   User[]   @relation("orgTree")
+  managedCenters Center[] @relation("centerManager")
+  managedManagements Management[] @relation("managementManager")
 
   systemAccess      SystemAccess[]
   sessions          Session[]
@@ -72,11 +86,81 @@ model User {
   notifications     Notification[]
   auditLogs         AuditLog[]
   taskComments      TaskComment[]
+  reportFiles       ReportFile[]
 
   // ثبت‌نام و بات بله
   reviewedRegistrations RegistrationRequest[]  @relation("RegistrationReviewer")
   baleLink          BaleLink?
   passwordResets    PasswordResetToken[]
+}
+
+// ---------- اطلاعات پایه: مراکز و کلینیک‌ها ----------
+
+// مرکز یا کلینیک — اطلاعات پایهٔ سازمانی؛ از سامانهٔ حضور و غیاب (تکنورز)
+// قابل همگام‌سازی است و در فرم کاربران به‌صورت کمبوباکس استفاده می‌شود.
+model Center {
+  id        String   @id @default(cuid())
+  code      String   @unique // کد مرکز — کلید همگام‌سازی با سامانهٔ حضور و غیاب
+  name      String
+  type      String   @default("CLINIC") // CENTER = مرکز، CLINIC = کلینیک، HQ = ستاد
+  region    String   @default("") // منطقه / حوزه
+  province  String   @default("")
+  city      String   @default("")
+  address   String   @default("")
+  phone     String   @default("")
+  lat       Float? // عرض جغرافیایی — نمایش روی نقشه
+  lng       Float? // طول جغرافیایی — نمایش روی نقشه
+  radiusM   Int      @default(300) // شعاع مجاز تردد به متر (مانند سامانهٔ حضور و غیاب)
+  isActive  Boolean  @default(true)
+  source    String   @default("MANUAL") // MANUAL / TECHNORZ — منشأ رکورد
+  managerId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  manager  User?        @relation("centerManager", fields: [managerId], references: [id], onDelete: SetNull)
+  users    User[]       @relation("userCenter")
+  clinics  User[]       @relation("userClinic")
+  managements Management[]
+
+  @@index([province])
+  @@index([type])
+}
+
+// مدیریت سازمانی — بند ۴: ثبت مدیریت، کارکنان آن و تعیین مدیر مدیریت
+model Management {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String   @default("")
+  centerId    String?
+  managerId   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  center  Center? @relation(fields: [centerId], references: [id], onDelete: SetNull)
+  manager User?   @relation("managementManager", fields: [managerId], references: [id], onDelete: SetNull)
+  members User[]  @relation("managementMembers")
+}
+
+// ---------- گزارش‌های اکسل (داشبورد چندماهه) ----------
+
+// فایل اکسل بارگذاری‌شده در بخش گزارش‌ها — رکوردهای پارس‌شده برای داشبورد
+model ReportFile {
+  id           String   @id @default(cuid())
+  name         String // نام فایل
+  month        Int      @default(0) // ماه شمسی ۱..۱۲ — ۰ یعنی نامشخص
+  year         Int      @default(0) // سال شمسی ۱۳xx/۱۴xx
+  sheet        String   @default("") // شیت استفاده‌شده
+  services     String   @default("[]") // فهرست خدمت‌ها (JSON)
+  records      String   @default("[]") // رکوردهای سطح مشاور × ماه (JSON)
+  summary      String   @default("{}") // خلاصهٔ مالی فایل (JSON)
+  nConsultants Int      @default(0)
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([year, month])
 }
 
 // درخواست ثبت‌نام کاربر جدید — تا تأیید مدیر هیچ User ساخته نمی‌شود

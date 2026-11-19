@@ -49,6 +49,14 @@ export async function GET(req: NextRequest) {
         twoFactorEnabled: true,
         lastLoginAt: true,
         createdAt: true,
+        centerId: true,
+        clinicId: true,
+        managementId: true,
+        managerId: true,
+        center: { select: { id: true, name: true, type: true, province: true } },
+        clinicCenter: { select: { id: true, name: true, type: true, province: true } },
+        management: { select: { id: true, name: true } },
+        manager: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: "asc" },
     });
@@ -94,6 +102,10 @@ export async function POST(req: NextRequest) {
       bankSheba?: string;
       avatarColor?: string;
       systemIds?: string[];
+      centerId?: string | null;
+      clinicId?: string | null;
+      managementId?: string | null;
+      managerId?: string | null;
     }>(req);
 
     if (!body.email || !body.name || !body.password)
@@ -131,6 +143,10 @@ export async function POST(req: NextRequest) {
         personalCode: body.personalCode || "",
         bankSheba: body.bankSheba || "",
         avatarColor: body.avatarColor || "#c2185b",
+        centerId: body.centerId || null,
+        clinicId: body.clinicId || null,
+        managementId: body.managementId || null,
+        managerId: body.managerId || null,
       },
     });
 

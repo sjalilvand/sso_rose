@@ -48,6 +48,10 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       status?: string;
       password?: string;
       systemIds?: string[];
+      centerId?: string | null;
+      clinicId?: string | null;
+      managementId?: string | null;
+      managerId?: string | null;
     }>(req);
 
     const target = await db.user.findUnique({ where: { id } });
@@ -96,6 +100,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     if (body.provinceCode !== undefined) data.provinceCode = body.provinceCode;
     if (body.personalCode !== undefined) data.personalCode = body.personalCode;
     if (body.bankSheba !== undefined) data.bankSheba = normalizeSheba(body.bankSheba);
+    // اطلاعات پایهٔ سازمانی — فقط مدیر (بندهای ۱ تا ۴)
+    if (isManager) {
+      if (body.centerId !== undefined) data.centerId = body.centerId || null;
+      if (body.clinicId !== undefined) data.clinicId = body.clinicId || null;
+      if (body.managementId !== undefined) data.managementId = body.managementId || null;
+      if (body.managerId !== undefined) {
+        if (body.managerId && body.managerId === id)
+          throw new ApiError("یک نفر نمی‌تواند مدیر خودش باشد", 400);
+        data.managerId = body.managerId || null;
+      }
+    }
     if (body.avatarColor) data.avatarColor = body.avatarColor;
     if (body.status && isManager) {
       if (id === me.id && body.status !== "ACTIVE")

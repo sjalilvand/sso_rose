@@ -28,6 +28,8 @@ import {
   Loader2,
   BookOpen,
   ClipboardList,
+  MapPin,
+  Network,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -311,6 +313,7 @@ const NAV_MAIN = [
   { href: "/calendar", label: "تقویم", icon: CalendarDays },
   { href: "/notes", label: "یادداشت‌ها", icon: StickyNote },
   { href: "/reports", label: "گزارش‌ها", icon: BarChart3 },
+  { href: "/team", label: "زیرمجموعه‌ها", icon: Network },
 ];
 
 export function PanelShell({ children }: { children: React.ReactNode }) {
@@ -388,6 +391,22 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                       <Link href="/admin/users">
                         <Shield />
                         <span>کاربران و مجوزها</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/centers")} tooltip="مراکز و کلینیک‌ها">
+                      <Link href="/admin/centers">
+                        <MapPin />
+                        <span>مراکز و کلینیک‌ها</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/managements")} tooltip="مدیریت‌های سازمانی">
+                      <Link href="/admin/managements">
+                        <Network />
+                        <span>مدیریت‌های سازمانی</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

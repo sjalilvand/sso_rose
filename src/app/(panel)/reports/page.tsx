@@ -20,9 +20,12 @@ import {
   Clock,
   Loader2,
   Download,
+  FileSpreadsheet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatShortJalali, faNum } from "@/lib/jalali";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ExcelDashboard } from "@/components/panel/excel-dashboard";
 
 interface ReportData {
   taskStats: {
@@ -115,8 +118,34 @@ export default function ReportsPage() {
         <div>
           <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
             <BarChart3 className="size-6 text-primary" />
-            گزارش‌ها و داشبورد {data.userStats ? "مدیریتی" : "شخصی"}
+            گزارش‌ها و داشبورد
           </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            داشبورد سازمانی از داده‌های رز هاب + داشبورد اکسل چندماهه (توصیفی، تحلیلی و تفسیری)
+          </p>
+        </div>
+      </div>
+
+      <Tabs defaultValue="excel" dir="rtl">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="excel" className="gap-1.5">
+            <FileSpreadsheet className="size-4" />
+            داشبورد اکسل چندماهه
+          </TabsTrigger>
+          <TabsTrigger value="org" className="gap-1.5">
+            <BarChart3 className="size-4" />
+            {"داشبورد سازمانی"}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="excel" className="mt-4">
+          <ExcelDashboard />
+        </TabsContent>
+
+        <TabsContent value="org" className="mt-4 space-y-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold">{data.userStats ? "گزارش مدیریتی" : "گزارش شخصی"}</h2>
           <p className="text-sm text-muted-foreground mt-1">
             {data.scopeNote} · گزارش بالینی و اطلاعات مراجعان از گزارش‌های عمومی تفکیک شده است.
           </p>
@@ -293,6 +322,8 @@ export default function ReportsPage() {
         <Database className="size-3" />
         منبع داده: {data.dataSource} · آخرین به‌روزرسانی: {formatShortJalali(data.lastUpdated)}
       </p>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

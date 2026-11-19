@@ -94,6 +94,14 @@ interface U {
   twoFactorEnabled: boolean;
   lastLoginAt: string | null;
   systemIds?: string[];
+  centerId?: string | null;
+  clinicId?: string | null;
+  managementId?: string | null;
+  managerId?: string | null;
+  center?: { id: string; name: string; type: string; province: string } | null;
+  clinicCenter?: { id: string; name: string; type: string; province: string } | null;
+  management?: { id: string; name: string } | null;
+  manager?: { id: string; name: string } | null;
 }
 
 interface ImportRowT {
@@ -150,6 +158,9 @@ interface Sys {
   status: string;
 }
 
+interface CenterLite { id: string; code: string; name: string; type: string; province: string; city: string; isActive: boolean }
+interface ManagementLite { id: string; name: string; isActive: boolean }
+
 const AVATAR_COLORS = ["#9c27b0", "#0f766e", "#c2185b", "#d97706", "#0369a1", "#7c3aed", "#6366f1", "#dc2626"];
 
 const STATUS_LABELS: Record<string, string> = {
@@ -161,9 +172,15 @@ const STATUS_LABELS: Record<string, string> = {
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<U[]>([]);
   const [systems, setSystems] = useState<Sys[]>([]);
+  const [centers, setCenters] = useState<CenterLite[]>([]);
+  const [managements, setManagements] = useState<ManagementLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // صفحه‌بندی جدول پرسنل — بند ۲
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // دیالوگ ویرایش کامل
   const [editOpen, setEditOpen] = useState(false);
@@ -189,6 +206,11 @@ export default function AdminUsersPage() {
   const [eProvCode, setEProvCode] = useState("");
   const [ePersonal, setEPersonal] = useState("");
   const [eSheba, setESheba] = useState("");
+  // اطلاعات پایهٔ سازمانی — بندهای ۱ تا ۴
+  const [eCenterId, setECenterId] = useState("");
+  const [eClinicId, setEClinicId] = useState("");
+  const [eManagementId, setEManagementId] = useState("");
+  const [eManagerId, setEManagerId] = useState("");
 
   // دیالوگ کاربر جدید
   const [createOpen, setCreateOpen] = useState(false);
@@ -224,12 +246,16 @@ export default function AdminUsersPage() {
 
   const load = useCallback(async () => {
     try {
-      const [u, s] = await Promise.all([
+      const [u, s, c, m] = await Promise.all([
         api<{ users: U[] }>("/api/users?withAccess=1"),
         api<{ systems: Sys[] }>("/api/systems"),
+        api<{ centers: CenterLite[] }>("/api/admin/centers").catch(() => ({ centers: [] as CenterLite[] })),
+        api<{ managements: ManagementLite[] }>("/api/admin/managements").catch(() => ({ managements: [] as ManagementLite[] })),
       ]);
       setUsers(u.users);
       setSystems(s.systems);
+      setCenters(c.centers);
+      setManagements(m.managements);
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -255,6 +281,20 @@ export default function AdminUsersPage() {
       ),
     [users, search]
   );
+
+  // ---------- صفحه‌بندی (بند ۲) ----------
+  const totalPages = pageSize === 0 ? 1 : Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paged = useMemo(
+    () =>
+      pageSize === 0
+        ? filtered
+        : filtered.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filtered, safePage, pageSize]
+  );
+  useEffect(() => {
+    setPage(1);
+  }, [search, pageSize]);
 
   // ---------- ایجاد ----------
   async function createUser() {
@@ -323,6 +363,10 @@ export default function AdminUsersPage() {
     setEProvCode(u.provinceCode || "");
     setEPersonal(u.personalCode || "");
     setESheba(u.bankSheba || "");
+    setECenterId(u.centerId || "");
+    setEClinicId(u.clinicId || "");
+    setEManagementId(u.managementId || "");
+    setEManagerId(u.managerId || "");
     setEditOpen(true);
   }
 
@@ -360,6 +404,10 @@ export default function AdminUsersPage() {
           provinceCode: eProvCode,
           personalCode: ePersonal,
           bankSheba: eSheba,
+          centerId: eCenterId || null,
+          clinicId: eClinicId || null,
+          managementId: eManagementId || null,
+          managerId: eManagerId || null,
           ...(ePass ? { password: ePass } : {}),
         },
       });
@@ -532,7 +580,7 @@ export default function AdminUsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((u) => (
+              {paged.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell>
                     <div className="flex items-center gap-2.5">
@@ -646,6 +694,41 @@ export default function AdminUsersPage() {
               )}
             </TableBody>
           </Table>
+          {/* نوار صفحه‌بندی — بند ۲ */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>
+                تعداد رکورد: <b className="text-foreground">{faNum(filtered.length)}</b>
+                {search && ` (از ${faNum(users.length)})`}
+              </span>
+              <span className="text-border">|</span>
+              <span>نمایش در هر صفحه:</span>
+              <Select dir="rtl" value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+                <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[10, 25, 50, 100].map((n) => (
+                    <SelectItem key={n} value={String(n)}>{faNum(n)}</SelectItem>
+                  ))}
+                  <SelectItem value="0">همه</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {pageSize > 0 && totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={safePage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                  قبلی
+                </Button>
+                <span className="text-xs text-muted-foreground px-1">
+                  صفحه {faNum(safePage)} از {faNum(totalPages)}
+                </span>
+                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={safePage >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                  بعدی
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -717,6 +800,75 @@ export default function AdminUsersPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">اطلاعات پایهٔ سازمانی (مرکز، کلینک، مدیریت و مدیر — بندهای ۱ تا ۴)</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>مرکز تخصیص</Label>
+                      <Select dir="rtl" value={eCenterId || "__none__"}
+                        onValueChange={(v) => setECenterId(v === "__none__" ? "" : v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          <SelectItem value="__none__">— انتخاب نشده —</SelectItem>
+                          {centers.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}{c.province ? ` (${c.province})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>کلینک خدمت</Label>
+                      <Select dir="rtl" value={eClinicId || "__none__"}
+                        onValueChange={(v) => {
+                          const id = v === "__none__" ? "" : v;
+                          setEClinicId(id);
+                          const c = centers.find((x) => x.id === id);
+                          if (c) setEClinic(c.name); // سازگاری با سامانه‌ها — نام متنی کلینک
+                        }}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          <SelectItem value="__none__">— انتخاب نشده —</SelectItem>
+                          {centers.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}{c.province ? ` (${c.province})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>مدیریت متبوع</Label>
+                      <Select dir="rtl" value={eManagementId || "__none__"}
+                        onValueChange={(v) => setEManagementId(v === "__none__" ? "" : v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          <SelectItem value="__none__">— انتخاب نشده —</SelectItem>
+                          {managements.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>مدیر مستقیم (سلسله‌مراتب)</Label>
+                      <Select dir="rtl" value={eManagerId || "__none__"}
+                        onValueChange={(v) => setEManagerId(v === "__none__" ? "" : v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          <SelectItem value="__none__">— بدون مدیر —</SelectItem>
+                          {users.filter((x) => x.id !== editing?.id).map((x) => (
+                            <SelectItem key={x.id} value={x.id}>{x.name} — {x.jobTitle || x.unit}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    مرکز و کلینک از اطلاعات پایهٔ «مراکز و کلینیک‌ها» خوانده می‌شود؛ مدیر مستقیم مبنای دیده‌شدن وظایف زیرمجموعه‌ها است.
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">مشخصات پرونده (مطابق فایل مشاورین)</Label>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div className="space-y-2">
@@ -726,10 +878,6 @@ export default function AdminUsersPage() {
                     <div className="space-y-2">
                       <Label>استان</Label>
                       <Input value={eProvince} onChange={(e) => setEProvince(e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>کلینک محل خدمت</Label>
-                      <Input value={eClinic} onChange={(e) => setEClinic(e.target.value)} placeholder="مثلاً کلینیک رز" />
                     </div>
                     <div className="space-y-2">
                       <Label>مدرک تحصیلی</Label>
