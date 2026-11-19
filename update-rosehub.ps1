@@ -251,6 +251,19 @@ if (Test-Path "scripts\bind-sso-systems.cjs") {
     Write-Warn2 "scripts\bind-sso-systems.cjs not found - skipped"
 }
 
+# ---------- Step 7b/9: seed base-info centers (phase 72) ----------
+Write-Step "Step 7b/9 - Seed base-info centers and clinics (phase 72)"
+if (Test-Path "scripts\seed-centers.cjs") {
+    node scripts/seed-centers.cjs
+    if ($LASTEXITCODE -eq 0) {
+        Write-Ok "Centers seeded (HQ + province clinics) - sync exact data from Attendance admin page"
+    } else {
+        Write-Warn2 "seed-centers failed - run manually later: node scripts/seed-centers.cjs"
+    }
+} else {
+    Write-Warn2 "scripts/seed-centers.cjs not found - skipped"
+}
+
 # ---------- Step 8/9: production build ----------
 Write-Step "Step 8/9 - Production build (a few minutes)"
 npm run build
