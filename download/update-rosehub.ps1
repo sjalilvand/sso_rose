@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 #  update-rosehub.ps1 - Update Rose Hub on the server from GitHub
 #  Steps: stop app (PM2 / port owner) + backup database + git sync
 #         (DB restored after reset) + npm install + prisma
@@ -251,6 +251,29 @@ if (Test-Path "scripts\bind-sso-systems.cjs") {
     Write-Warn2 "scripts\bind-sso-systems.cjs not found - skipped"
 }
 
+# ---------- Step 7b/9: seed base-info centers + org managements (phase 72) ----------
+Write-Step "Step 7b/9 - Seed base-info centers and clinics (phase 72)"
+if (Test-Path "scripts\seed-centers.cjs") {
+    node scripts/seed-centers.cjs
+    if ($LASTEXITCODE -eq 0) {
+        Write-Ok "Centers seeded (HQ + province clinics) - sync exact data from Attendance admin page"
+    } else {
+        Write-Warn2 "seed-centers failed - run manually later: node scripts/seed-centers.cjs"
+    }
+} else {
+    Write-Warn2 "scripts/seed-centers.cjs not found - skipped"
+}
+if (Test-Path "scripts\seed-org-structure.cjs") {
+    node scripts/seed-org-structure.cjs
+    if ($LASTEXITCODE -eq 0) {
+        Write-Ok "Org managements seeded (clinic managers + executive officers)"
+    } else {
+        Write-Warn2 "seed-org-structure failed - run manually later: node scripts/seed-org-structure.cjs"
+    }
+} else {
+    Write-Warn2 "scripts/seed-org-structure.cjs not found - skipped"
+}
+
 # ---------- Step 8/9: production build ----------
 Write-Step "Step 8/9 - Production build (a few minutes)"
 npm run build
@@ -329,3 +352,15 @@ if ($healthy) {
 } else {
     Write-Warn2 "App did not respond - check: pm2 logs rose-hub"
 }
+
+# ---------- Step 9c/9: keep the C:\ root copy of this script fresh ----------
+# کاربر معمولاً C:\update-rosehub.ps1 را اجرا می‌کند؛ نسخهٔ رپو باید آن را
+# بروز نگه دارد تا قدم‌های جدید (مثل seed مراکز) از دست نروند.
+try {
+    $rootCopy = "C:\update-rosehub.ps1"
+    $selfPath = $PSCommandPath
+    if ($selfPath -and ((Resolve-Path $selfPath -ErrorAction SilentlyContinue).Path -ne (Resolve-Path $rootCopy -ErrorAction SilentlyContinue).Path)) {
+        Copy-Item -LiteralPath $selfPath -Destination $rootCopy -Force
+        Write-Ok "Root launcher refreshed: C:\update-rosehub.ps1 = $selfPath"
+    }
+} catch {}
