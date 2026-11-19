@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth";
 import { apiError, json } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
 import type { Permission } from "@/lib/permissions";
+import { PANEL_PAGES, defaultPageAccess } from "@/lib/pages";
 
 export async function GET(req: NextRequest) {
   try {
@@ -34,8 +35,19 @@ export async function GET(req: NextRequest) {
       if (lastMsg && lastMsg.createdAt > m.lastReadAt) unreadConversations++;
     }
 
+    // دسترسی صفحات — پیش‌فرض همه مجاز؛ PagePermission فقط ممنوع‌سازی ثبت می‌کند
+    let pageAccess = defaultPageAccess();
+    if (user.role !== "SUPER_ADMIN") {
+      const denied = await db.pagePermission.findMany({
+        where: { userId: user.id, allowed: false },
+        select: { pageKey: true },
+      });
+      for (const d of denied) pageAccess[d.pageKey] = false;
+    }
+
     return json({
       user,
+      pageAccess,
       systems: access.map((a) => a.system),
       permissions: {
         "users.manage": hasPermission(user.role, "users.manage"),

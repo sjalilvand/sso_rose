@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
+import { PANEL_PAGES } from "@/lib/pages";
 import {
   Dialog,
   DialogContent,
@@ -100,6 +101,7 @@ interface U {
   clinicId?: string | null;
   managementId?: string | null;
   managerId?: string | null;
+  pagePermissions?: Array<{ pageKey: string; allowed: boolean }>;
   center?: { id: string; name: string; type: string; province: string } | null;
   clinicCenter?: { id: string; name: string; type: string; province: string } | null;
   management?: { id: string; name: string } | null;
@@ -213,6 +215,7 @@ export default function AdminUsersPage() {
   const [eClinicId, setEClinicId] = useState("");
   const [eManagementId, setEManagementId] = useState("");
   const [eManagerId, setEManagerId] = useState("");
+  const [ePages, setEPages] = useState<Record<string, boolean>>({});
 
   // دیالوگ کاربر جدید
   const [createOpen, setCreateOpen] = useState(false);
@@ -369,6 +372,11 @@ export default function AdminUsersPage() {
     setEClinicId(u.clinicId || "");
     setEManagementId(u.managementId || "");
     setEManagerId(u.managerId || "");
+    // دسترسی صفحات — پیش‌فرض همه مجاز؛ رکوردهای ثبت‌شده اعمال می‌شوند
+    const pa: Record<string, boolean> = {};
+    for (const p of PANEL_PAGES) pa[p.key] = true;
+    for (const perm of u.pagePermissions || []) pa[perm.pageKey] = perm.allowed;
+    setEPages(pa);
     setEditOpen(true);
   }
 
@@ -410,6 +418,7 @@ export default function AdminUsersPage() {
           clinicId: eClinicId || null,
           managementId: eManagementId || null,
           managerId: eManagerId || null,
+          pageAccess: ePages,
           ...(ePass ? { password: ePass } : {}),
         },
       });
@@ -856,6 +865,24 @@ export default function AdminUsersPage() {
                   </p>
                 </div>
                 <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">دسترسی صفحات — کدام فرم‌ها و صفحه‌ها برای این کاربر دیده شود</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {PANEL_PAGES.filter((p) => p.group === "workspace").map((p) => (
+                      <div key={p.key} className="flex items-center justify-between rounded-lg border px-2.5 py-1.5">
+                        <span className="text-[11px] truncate">{p.label}</span>
+                        <Switch
+                          checked={ePages[p.key] !== false}
+                          onCheckedChange={(v) => setEPages((s2) => ({ ...s2, [p.key]: v }))}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    کلید خاموش یعنی کاربر این صفحه را نمی‌بیند (هم در منو پنهان می‌شود و هم با آدرس مستقیم مسدود است).
+                    صفحات مدیریتی برای نقش‌های مدیریتی همیشه فعال است.
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">مشخصات پرونده (مطابق فایل مشاورین)</Label>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div className="space-y-2">
@@ -1250,7 +1277,9 @@ export default function AdminUsersPage() {
                           <span className="inline-flex items-center gap-1">
                             {r.name}
                             {!r.nidValid && !r.error && (
-                              <AlertCircle className="size-3.5 text-amber-500" title="رقم کنترلی کد ملی معتبر نیست — بررسی کنید" />
+                              <span title="رقم کنترلی کد ملی معتبر نیست — بررسی کنید" className="inline-flex">
+                                <AlertCircle className="size-3.5 text-amber-500" />
+                              </span>
                             )}
                           </span>
                         </TableCell>

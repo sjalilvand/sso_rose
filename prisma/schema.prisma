@@ -58,40 +58,43 @@ model User {
   updatedAt        DateTime   @updatedAt
 
   // اطلاعات پایه سازمانی — فاز ۷۲
-  centerId       String? // مرکز تخصیص — از اطلاعات پایه مراکز
-  clinicId       String? // کلینک خدمت — از اطلاعات پایه مراکز
-  managementId   String? // مدیریت متبوع
-  managerId      String? // مدیر مستقیم (سلسله‌مراتب سازمانی)
+  centerId     String? // مرکز تخصیص — از اطلاعات پایه مراکز
+  clinicId     String? // کلینک خدمت — از اطلاعات پایه مراکز
+  managementId String? // مدیریت متبوع
+  managerId    String? // مدیر مستقیم (سلسله‌مراتب سازمانی)
 
-  center         Center?  @relation("userCenter", fields: [centerId], references: [id], onDelete: SetNull)
-  clinicCenter   Center?  @relation("userClinic", fields: [clinicId], references: [id], onDelete: SetNull)
-  management     Management? @relation("managementMembers", fields: [managementId], references: [id], onDelete: SetNull)
-  manager        User?    @relation("orgTree", fields: [managerId], references: [id], onDelete: SetNull)
-  subordinates   User[]   @relation("orgTree")
-  managedCenters Center[] @relation("centerManager")
+  center             Center?      @relation("userCenter", fields: [centerId], references: [id], onDelete: SetNull)
+  clinicCenter       Center?      @relation("userClinic", fields: [clinicId], references: [id], onDelete: SetNull)
+  management         Management?  @relation("managementMembers", fields: [managementId], references: [id], onDelete: SetNull)
+  manager            User?        @relation("orgTree", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates       User[]       @relation("orgTree")
+  managedCenters     Center[]     @relation("centerManager")
   managedManagements Management[] @relation("managementManager")
 
-  systemAccess      SystemAccess[]
-  sessions          Session[]
-  tasksAssigned     Task[]         @relation("assignee")
-  tasksCreated      Task[]         @relation("creator")
-  announcements     Announcement[]
-  announcementAcks  AnnouncementAck[]
-  eventsOwned       CalendarEvent[]
-  eventAttendances  EventAttendee[]
-  notes             Note[]
-  noteShares        NoteShare[]
-  conversations     ConversationMember[]
-  messages          Message[]
-  notifications     Notification[]
-  auditLogs         AuditLog[]
-  taskComments      TaskComment[]
-  reportFiles       ReportFile[]
+  systemAccess     SystemAccess[]
+  sessions         Session[]
+  tasksAssigned    Task[]               @relation("assignee")
+  tasksCreated     Task[]               @relation("creator")
+  announcements    Announcement[]
+  announcementAcks AnnouncementAck[]
+  eventsOwned      CalendarEvent[]
+  eventAttendances EventAttendee[]
+  notes            Note[]
+  noteShares       NoteShare[]
+  conversations    ConversationMember[]
+  messages         Message[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+  taskComments     TaskComment[]
+  reportFiles      ReportFile[]
+  excelDatasets    ExcelDataset[]
+  customIndicators CustomIndicator[]
+  pagePermissions  PagePermission[]
 
   // ثبت‌نام و بات بله
-  reviewedRegistrations RegistrationRequest[]  @relation("RegistrationReviewer")
-  baleLink          BaleLink?
-  passwordResets    PasswordResetToken[]
+  reviewedRegistrations RegistrationRequest[] @relation("RegistrationReviewer")
+  baleLink              BaleLink?
+  passwordResets        PasswordResetToken[]
 }
 
 // ---------- اطلاعات پایه: مراکز و کلینیک‌ها ----------
@@ -105,6 +108,7 @@ model Center {
   type      String   @default("CLINIC") // CENTER = مرکز، CLINIC = کلینیک، HQ = ستاد
   region    String   @default("") // منطقه / حوزه
   province  String   @default("")
+  county    String   @default("") // شهرستان — سطح بین استان و شهر برای سلسله‌مراتب
   city      String   @default("")
   address   String   @default("")
   phone     String   @default("")
@@ -117,9 +121,9 @@ model Center {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  manager  User?        @relation("centerManager", fields: [managerId], references: [id], onDelete: SetNull)
-  users    User[]       @relation("userCenter")
-  clinics  User[]       @relation("userClinic")
+  manager     User?        @relation("centerManager", fields: [managerId], references: [id], onDelete: SetNull)
+  users       User[]       @relation("userCenter")
+  clinics     User[]       @relation("userClinic")
   managements Management[]
 
   @@index([province])
@@ -219,7 +223,7 @@ model SupportTicket {
 
 // دسترسی هر کاربر به هر سامانه
 model SystemAccess {
-  id        String @id @default(cuid())
+  id        String   @id @default(cuid())
   userId    String
   systemId  String
   createdAt DateTime @default(now())
@@ -260,7 +264,7 @@ model ClinicSystem {
   connectionLevel ConnectionLevel @default(BASIC)
   status          String          @default("متصل") // وضعیت پایش فنی
   clientId        String?         @unique // شناسه عمومی سامانه برای اتصال SSO
-  clientSecret    String?         // رمز مشترک اعتبارسنجی توکن SSO (فقط مدیر کل و تیم فنی سامانه)
+  clientSecret    String? // رمز مشترک اعتبارسنجی توکن SSO (فقط مدیر کل و تیم فنی سامانه)
   sortOrder       Int             @default(0)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -310,8 +314,8 @@ model Announcement {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  author  User             @relation(fields: [authorId], references: [id])
-  acks    AnnouncementAck[]
+  author User              @relation(fields: [authorId], references: [id])
+  acks   AnnouncementAck[]
 }
 
 model AnnouncementAck {
@@ -358,9 +362,9 @@ model Task {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  assignee    User          @relation("assignee", fields: [assigneeId], references: [id])
-  creator     User          @relation("creator", fields: [creatorId], references: [id])
-  comments    TaskComment[]
+  assignee User          @relation("assignee", fields: [assigneeId], references: [id])
+  creator  User          @relation("creator", fields: [creatorId], references: [id])
+  comments TaskComment[]
 }
 
 model TaskComment {
@@ -405,15 +409,15 @@ model CalendarEvent {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  owner      User            @relation(fields: [ownerId], references: [id])
-  attendees  EventAttendee[]
+  owner     User            @relation(fields: [ownerId], references: [id])
+  attendees EventAttendee[]
 }
 
 model EventAttendee {
-  id       String  @id @default(cuid())
+  id       String @id @default(cuid())
   eventId  String
   userId   String
-  response String  @default("PENDING") // PENDING / YES / NO / MAYBE
+  response String @default("PENDING") // PENDING / YES / NO / MAYBE
 
   event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -439,8 +443,8 @@ model Note {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  author  User        @relation(fields: [authorId], references: [id])
-  shares  NoteShare[]
+  author User        @relation(fields: [authorId], references: [id])
+  shares NoteShare[]
 }
 
 model NoteShare {
@@ -475,11 +479,11 @@ model Conversation {
 }
 
 model ConversationMember {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   conversationId String
   userId         String
-  lastReadAt     DateTime  @default(now())
-  joinedAt       DateTime  @default(now())
+  lastReadAt     DateTime @default(now())
+  joinedAt       DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -529,4 +533,51 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// ---------- داشبورد عمومی اکسل (هر ساختاری) — فاز ۷۳ ----------
+
+// فایل اکسل بارگذاری‌شده با ساختار دلخواه — ستون‌ها خودکار تشخیص داده می‌شوند
+model ExcelDataset {
+  id           String   @id @default(cuid())
+  name         String // نام فایل
+  sheetNames   String   @default("[]") // نام شیت‌ها (JSON)
+  activeSheet  String   @default("") // شیت پیش‌فرض
+  columns      String   @default("[]") // [{name,type}] — type: number/text/date
+  rows         String   @default("[]") // رکوردها (JSON — تا سقف مجاز)
+  profile      String   @default("{}") // پروفایل آماری ستون‌ها (JSON)
+  nRows        Int      @default(0) // تعداد رکوردهای ذخیره‌شده
+  nRowsTotal   Int      @default(0) // تعداد کل رکوردهای فایل اصلی
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+}
+
+// شاخص سفارشی — فرمول محاسبه‌شده روی ستون‌های داده (سطح ردیف یا کل داده)
+model CustomIndicator {
+  id          String   @id @default(cuid())
+  name        String
+  formula     String
+  kind        String   @default("ROW") // ROW = ستون محاسباتی، AGG = شاخص کل
+  description String   @default("")
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+}
+
+// دسترسی صفحات در سطح کاربر — کدام فرم/صفحه دیده شود یا نشود (فاز ۷۳)
+model PagePermission {
+  id      String  @id @default(cuid())
+  userId  String
+  pageKey String // کلید صفحه — src/lib/pages.ts
+  allowed Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pageKey])
+  @@index([userId])
 }

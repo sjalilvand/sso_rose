@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
     const body = await readBody<{
       code?: string; name?: string; type?: string; region?: string; province?: string;
-      city?: string; address?: string; phone?: string; lat?: number | string | null;
+      county?: string; city?: string; address?: string; phone?: string; lat?: number | string | null;
       lng?: number | string | null; radiusM?: number; managerId?: string | null; isActive?: boolean;
     }>(req);
 
@@ -49,6 +49,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
           : {}),
         ...(body.region !== undefined ? { region: body.region.trim() } : {}),
         ...(body.province !== undefined ? { province: body.province.trim() } : {}),
+        ...(body.county !== undefined ? { county: body.county.trim() } : {}),
         ...(body.city !== undefined ? { city: body.city.trim() } : {}),
         ...(body.address !== undefined ? { address: body.address.trim() } : {}),
         ...(body.phone !== undefined ? { phone: body.phone.trim() } : {}),

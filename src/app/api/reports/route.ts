@@ -8,6 +8,18 @@ import { hasPermission } from "@/lib/permissions";
  * داشبورد گزارش‌ها — گزارش‌های مدیریتی تفکیک‌شده از داده‌های بالینی
  * گزارش‌های شخصی برای همه، گزارش‌های سازمانی برای مدیران
  */
+
+interface ReportUserStats {
+  total: number;
+  active: number;
+  suspended: number;
+  inactive: number;
+  byRole: Record<string, number>;
+  accessCount: number;
+  announcementsThisMonth: number;
+  announcementAckRate: number;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const user = await requireAuth(req);
@@ -43,7 +55,7 @@ export async function GET(req: NextRequest) {
     };
 
     // کاربران و دسترسی‌ها
-    let userStats = null;
+    let userStats: ReportUserStats | null = null;
     if (hasPermission(user.role, "reports.view")) {
       const users = await db.user.findMany({ select: { status: true, role: true, unit: true, lastLoginAt: true } });
       const access = await db.systemAccess.findMany();

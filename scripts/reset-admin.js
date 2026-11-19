@@ -19,17 +19,9 @@ const newPass = args[0] || "";
 const targetId = args[1] || "";
 const SEL = { id: true, email: true, username: true, name: true, role: true, status: true };
 
-// load DATABASE_URL from .env next to this file (same as the running app)
-let dbUrl = process.env.DATABASE_URL || "";
-const envFile = path.join(__dirname, ".env");
-if (fs.existsSync(envFile)) {
-  for (const line of fs.readFileSync(envFile, "utf8").split(/\r?\n/)) {
-    const m = line.match(/^\s*DATABASE_URL\s*=\s*(.+)\s*$/);
-    if (m) dbUrl = m[1].trim();
-  }
-}
-if (!dbUrl) dbUrl = "file:../db/custom.db";
-process.env.DATABASE_URL = dbUrl;
+// load DATABASE_URL from .env (quotes stripped — same as the running app)
+const { resolveDatabaseUrl } = require("./lib-env.cjs");
+resolveDatabaseUrl();
 
 const { PrismaClient } = require("@prisma/client");
 const db = new PrismaClient();

@@ -10,10 +10,10 @@
  * سامانهٔ حضور و غیاب (تکنورز) بعداً همهٔ رکوردها را با دادهٔ اصلی بروز می‌کند.
  */
 const path = require("path");
+const { resolveDatabaseUrl } = require("./lib-env.cjs");
 
 const ROOT = path.resolve(__dirname, "..");
-const DATABASE_URL = process.env.DATABASE_URL || "file:" + path.join(ROOT, "db", "custom.db");
-process.env.DATABASE_URL = DATABASE_URL;
+resolveDatabaseUrl(); // DATABASE_URL با حذف کوتیشن‌ها از .env
 
 const { PrismaClient } = require("@prisma/client");
 const db = new PrismaClient();

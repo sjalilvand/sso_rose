@@ -5,6 +5,7 @@ import type { Map as LeafletMap, CircleMarker as LeafletCircleMarker } from "lea
 import "leaflet/dist/leaflet.css";
 import { api } from "@/lib/client";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ import {
 import {
   MapPin, Plus, Loader2, Search, Building2, Hospital, Landmark, HeartHandshake,
   RefreshCw, Pencil, Trash2, Crosshair, LocationEdit, Ban, Layers,
+  ChevronDown, ChevronLeft, Network, UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
 import { faNum } from "@/lib/jalali";
@@ -45,7 +47,7 @@ import {
 
 interface Center {
   id: string; code: string; name: string; type: string; region: string;
-  province: string; city: string; address: string; phone: string;
+  province: string; county: string; city: string; address: string; phone: string;
   lat: number | null; lng: number | null; radiusM: number;
   isActive: boolean; source: string; managerId: string | null;
 }
@@ -73,8 +75,8 @@ interface GeoResult {
 }
 
 const emptyForm = {
-  id: "", code: "", name: "", type: "CLINIC", region: "", province: "", city: "",
-  address: "", phone: "", lat: "", lng: "", radiusM: "300", isActive: true,
+  id: "", code: "", name: "", type: "CLINIC", region: "", province: "", county: "", city: "",
+  address: "", phone: "", lat: "", lng: "", radiusM: "300", isActive: true, managerId: "",
 };
 
 // عبارت کمیته امداد — برای جستجوی دفاتر کمیته امداد امام خمینی (ره)
@@ -90,6 +92,10 @@ export default function AdminCentersPage() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
+  const [view, setView] = useState<"map" | "org">("map"); // نقشه یا ساختار استان←شهرستان
+  const [openProv, setOpenProv] = useState<Set<string>>(new Set());
+  const [openCounty, setOpenCounty] = useState<Set<string>>(new Set());
+  const [userOpts, setUserOpts] = useState<Array<{ value: string; label: string; hint?: string }> | null>(null);
   const [saving, setSaving] = useState(false);
   const [pickMode, setPickMode] = useState(false); // انتخاب مختصات روی نقشه
 
@@ -413,6 +419,23 @@ export default function AdminCentersPage() {
     }
   }
 
+  // گزینه‌های «مدیر مرکز» — بارگذاری در شروع صفحه
+  useEffect(() => {
+    api<{ users: Array<{ id: string; name: string; jobTitle: string; unit: string }> }>("/api/users")
+      .then((d) => setUserOpts(d.users.map((u) => ({ value: u.id, label: u.name, hint: u.jobTitle || u.unit }))))
+      .catch(() => setUserOpts([]));
+  }, []);
+
+  async function ensureUserOpts() {
+    if (userOpts !== null) return;
+    try {
+      const d = await api<{ users: Array<{ id: string; name: string; jobTitle: string; unit: string }> }>("/api/users");
+      setUserOpts(d.users.map((u) => ({ value: u.id, label: u.name, hint: u.jobTitle || u.unit })));
+    } catch {
+      setUserOpts([]);
+    }
+  }
+
   // ---------- ذخیره ----------
   async function save() {
     if (!form.name.trim()) { toast.error("نام مرکز الزامی است"); return; }
@@ -424,7 +447,9 @@ export default function AdminCentersPage() {
         type: form.type,
         region: form.region.trim(),
         province: form.province.trim(),
+        county: form.county.trim(),
         city: form.city.trim(),
+        managerId: form.managerId || null,
         address: form.address.trim(),
         phone: form.phone.trim(),
         lat: form.lat === "" ? null : Number(form.lat),
@@ -451,12 +476,13 @@ export default function AdminCentersPage() {
   }
 
   function openEdit(c: Center) {
+    ensureUserOpts();
     setForm({
       id: c.id, code: c.code, name: c.name, type: c.type, region: c.region,
-      province: c.province, city: c.city, address: c.address, phone: c.phone,
+      province: c.province, county: c.county || "", city: c.city, address: c.address, phone: c.phone,
       lat: c.lat === null ? "" : String(c.lat),
       lng: c.lng === null ? "" : String(c.lng),
-      radiusM: String(c.radiusM), isActive: c.isActive,
+      radiusM: String(c.radiusM), isActive: c.isActive, managerId: c.managerId || "",
     });
     setFormOpen(true);
     setPickMode(false);
@@ -502,6 +528,112 @@ export default function AdminCentersPage() {
 
   // گزینه‌های استان/شهر فرم — مقدار فعلی همیشه در فهرست است (حتی اگر خارج فهرست استاندارد باشد)
   // توجه: همهٔ هوک‌ها باید قبل از هر return شرطی بیایند
+  // ---------- ساختار سازمانی استان ← شهرستان ----------
+  const provincesOrg = useMemo(
+    () => [...new Set(centers.map((c) => c.province).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fa")),
+    [centers]
+  );
+  const countySuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of centers) {
+      if (c.county && (!form.province || c.province === form.province)) set.add(c.county);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "fa"));
+  }, [centers, form.province]);
+
+  function managerName(id: string): string {
+    return userOpts?.find((u) => u.value === id)?.label || "";
+  }
+
+  const orgTree = useMemo(() => {
+    if (provincesOrg.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        {provincesOrg.map((prov) => {
+          const provCenters = centers.filter((c) => c.province === prov);
+          const counties = [...new Set(provCenters.map((c) => c.county || "بدون شهرستان"))]
+            .sort((a, b) => a.localeCompare(b, "fa"));
+          const provOpen = !openProv.has(prov); // پیش‌فرض باز
+          return (
+            <div key={prov} className="rounded-xl border overflow-hidden">
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2.5 bg-muted/40 hover:bg-muted/70 transition-colors text-start"
+                onClick={() => setOpenProv((s) => {
+                  const n = new Set(s);
+                  if (n.has(prov)) n.delete(prov); else n.add(prov);
+                  return n;
+                })}
+              >
+                {provOpen ? <ChevronDown className="size-4 shrink-0" /> : <ChevronLeft className="size-4 shrink-0" />}
+                <MapPin className="size-4 text-primary shrink-0" />
+                <span className="text-sm font-bold flex-1">استان {prov}</span>
+                <Badge variant="secondary" className="text-[10px] shrink-0">{faNum(provCenters.length)} مرکز</Badge>
+              </button>
+              {provOpen && (
+                <div className="divide-y">
+                  {counties.map((cnt) => {
+                    const cntCenters = provCenters.filter((c) => (c.county || "بدون شهرستان") === cnt);
+                    const cntOpen = !openCounty.has(prov + "|" + cnt);
+                    return (
+                      <div key={cnt} className="ps-4">
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/40 transition-colors text-start"
+                          onClick={() => setOpenCounty((s) => {
+                            const n = new Set(s);
+                            const k = prov + "|" + cnt;
+                            if (n.has(k)) n.delete(k); else n.add(k);
+                            return n;
+                          })}
+                        >
+                          {cntOpen ? <ChevronDown className="size-3.5 shrink-0" /> : <ChevronLeft className="size-3.5 shrink-0" />}
+                          <Building2 className="size-3.5 text-sky-700 shrink-0" />
+                          <span className="text-xs font-semibold flex-1">شهرستان {cnt}</span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">{faNum(cntCenters.length)} مرکز</span>
+                        </button>
+                        {cntOpen && (
+                          <div className="ps-6 pe-2 pb-2 space-y-1">
+                            {cntCenters.map((c) => (
+                              <div
+                                key={c.id}
+                                className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 hover:bg-muted/40 transition-colors cursor-pointer"
+                                onClick={() => openEdit(c)}
+                              >
+                                {c.type === "HQ" ? (
+                                  <Landmark className="size-3.5 text-purple-700 shrink-0" />
+                                ) : c.type === "CENTER" ? (
+                                  <Building2 className="size-3.5 text-sky-700 shrink-0" />
+                                ) : c.type === "EMDAD" ? (
+                                  <HeartHandshake className="size-3.5 text-amber-600 shrink-0" />
+                                ) : (
+                                  <Hospital className="size-3.5 text-primary shrink-0" />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium truncate">{c.name}{c.isActive ? "" : " (غیرفعال)"}</p>
+                                  <p className="text-[10px] text-muted-foreground truncate">
+                                    کد {c.code}{c.city ? ` · ${c.city}` : ""}
+                                    {c.address ? ` · ${c.address}` : ""}
+                                  </p>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground shrink-0 flex items-center gap-1">
+                                  <UserRound className="size-3" />
+                                  {managerName(c.managerId || "") || "بدون مدیر"}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }, [provincesOrg, centers, openProv, openCounty, userOpts]);
+
   const provinceOptions = useMemo(() => {
     const opts = IR_PROVINCES.map((p) => ({ value: p, label: p }));
     if (form.province && !IR_PROVINCES.some((p) => p === form.province)) {
@@ -516,7 +648,7 @@ export default function AdminCentersPage() {
       : IR_CITIES;
     const opts = pool.map((c) => ({ value: c.city, label: c.city, hint: form.province ? undefined : c.province }));
     if (form.city && !pool.some((c) => c.city === form.city)) {
-      opts.unshift({ value: form.city, label: form.city });
+      opts.unshift({ value: form.city, label: form.city, hint: undefined });
     }
     return opts;
   }, [form.province, form.city]);
@@ -582,6 +714,37 @@ export default function AdminCentersPage() {
         </span>
       </div>
 
+      {/* کلید نما: نقشه یا ساختار سازمانی */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-semibold text-muted-foreground">نمای نمایش:</span>
+        <div className="flex rounded-xl border overflow-hidden">
+          <button
+            className={`px-3 h-8 text-xs flex items-center gap-1.5 ${view === "map" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            onClick={() => setView("map")}
+          >
+            <MapPin className="size-3.5" /> نقشه و فهرست
+          </button>
+          <button
+            className={`px-3 h-8 text-xs flex items-center gap-1.5 border-s ${view === "org" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            onClick={() => setView("org")}
+          >
+            <Network className="size-3.5" /> ساختار استان ← شهرستان ← مراکز
+          </button>
+        </div>
+      </div>
+
+      {view === "org" ? (
+        <Card>
+          <CardContent className="p-3 max-h-[720px] overflow-y-auto">
+            {orgTree}
+            {provincesOrg.length === 0 && (
+              <p className="text-center text-sm text-muted-foreground py-10">
+                هنوز مرکزی ثبت نشده است.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
       <div className="grid lg:grid-cols-5 gap-4">
         {/* فهرست مراکز */}
         <Card className="lg:col-span-2">
@@ -605,7 +768,8 @@ export default function AdminCentersPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{c.name}</p>
                     <p className="text-[11px] text-muted-foreground truncate">
-                      {c.province || "بدون استان"} · کد {c.code} · شعاع {faNum(c.radiusM)} متر
+                      {[c.province, c.county, c.city].filter(Boolean).join(" › ") || "بدون استان"} · کد {c.code}
+                      {c.managerId && managerName(c.managerId) ? ` · مدیر: ${managerName(c.managerId)}` : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -709,6 +873,7 @@ export default function AdminCentersPage() {
         </Card>
       </div>
 
+      )}
       {/* فرم مرکز */}
       <Dialog open={formOpen} onOpenChange={(v) => { if (!v) { setFormOpen(false); setPickMode(false); pickModeRef.current = false; } }}>
         <DialogContent className="sm:max-w-xl max-h-[88vh] overflow-y-auto" dir="rtl">
@@ -746,16 +911,28 @@ export default function AdminCentersPage() {
                 <Input value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>استان</Label>
                 <SearchableSelect
                   value={form.province}
-                  onChange={(v) => { setForm((f) => ({ ...f, province: v, city: "" })); if (v) flyToCity(v, 11); }}
+                  onChange={(v) => { setForm((f) => ({ ...f, province: v, county: "", city: "" })); if (v) flyToCity(v, 11); }}
                   options={provinceOptions}
                   noneLabel="— انتخاب نشده —"
                   placeholder="انتخاب استان"
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label>شهرستان</Label>
+                <Input
+                  value={form.county}
+                  onChange={(e) => setForm((f) => ({ ...f, county: e.target.value }))}
+                  placeholder="مثلاً مراغه"
+                  list="county-suggestions"
+                />
+                <datalist id="county-suggestions">
+                  {countySuggestions.map((c) => <option key={c} value={c} />)}
+                </datalist>
               </div>
               <div className="space-y-1.5">
                 <Label>شهر</Label>
@@ -767,6 +944,17 @@ export default function AdminCentersPage() {
                   placeholder="انتخاب شهر — نقشه به آن شهر می‌رود"
                 />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><UserRound className="size-3.5" /> مدیر مرکز</Label>
+              <SearchableSelect
+                value={form.managerId}
+                onChange={(v) => setForm((f) => ({ ...f, managerId: v }))}
+                options={userOpts || []}
+                noneLabel="— بدون مدیر —"
+                placeholder="انتخاب مدیر مرکز (از کاربران)"
+                loading={userOpts === null}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>آدرس</Label>

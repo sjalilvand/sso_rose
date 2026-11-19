@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireAuth, hashPassword, audit, ApiError, normalizeIdentifier } from "@/lib/auth";
 import { apiError, json, readBody } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
+import { PANEL_PAGES } from "@/lib/pages";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -52,6 +53,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       clinicId?: string | null;
       managementId?: string | null;
       managerId?: string | null;
+      pageAccess?: Record<string, boolean>;
     }>(req);
 
     const target = await db.user.findUnique({ where: { id } });
@@ -112,6 +114,20 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       }
     }
     if (body.avatarColor) data.avatarColor = body.avatarColor;
+
+    // دسترسی صفحات (فقط مدیر) — فاز ۷۳
+    if (body.pageAccess && typeof body.pageAccess === "object") {
+      if (!isManager) throw new ApiError("تغییر دسترسی صفحات فقط توسط مدیر ممکن است", 403);
+      const entries = Object.entries(body.pageAccess);
+      for (const [pageKey, allowed] of entries) {
+        if (!PANEL_PAGES.some((p) => p.key === pageKey)) continue;
+        await db.pagePermission.upsert({
+          where: { userId_pageKey: { userId: id, pageKey } },
+          create: { userId: id, pageKey, allowed: !!allowed },
+          update: { allowed: !!allowed },
+        });
+      }
+    }
     if (body.status && isManager) {
       if (id === me.id && body.status !== "ACTIVE")
         throw new ApiError("تغییر وضعیت حساب خودتان مجاز نیست", 400);

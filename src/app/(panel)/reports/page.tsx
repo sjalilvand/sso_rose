@@ -21,11 +21,13 @@ import {
   Loader2,
   Download,
   FileSpreadsheet,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatShortJalali, faNum } from "@/lib/jalali";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ExcelDashboard } from "@/components/panel/excel-dashboard";
+import { UniversalDashboard } from "@/components/panel/universal-dashboard";
 
 interface ReportData {
   taskStats: {
@@ -121,13 +123,17 @@ export default function ReportsPage() {
             گزارش‌ها و داشبورد
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            داشبورد سازمانی از داده‌های رز هاب + داشبورد اکسل چندماهه (توصیفی، تحلیلی و تفسیری)
+            داشبورد سازمانی از داده‌های رز هاب + داشبورد عمومی هر فایل اکسل (توصیفی، تحلیلی، تفسیری، مدل‌سازی و پیشنهادی)
           </p>
         </div>
       </div>
 
-      <Tabs defaultValue="excel" dir="rtl">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+      <Tabs defaultValue="universal" dir="rtl">
+        <TabsList className="grid w-full max-w-2xl grid-cols-3">
+          <TabsTrigger value="universal" className="gap-1.5">
+            <Sparkles className="size-4" />
+            داشبورد عمومی اکسل
+          </TabsTrigger>
           <TabsTrigger value="excel" className="gap-1.5">
             <FileSpreadsheet className="size-4" />
             داشبورد اکسل چندماهه
@@ -137,6 +143,10 @@ export default function ReportsPage() {
             {"داشبورد سازمانی"}
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="universal" className="mt-4">
+          <UniversalDashboard />
+        </TabsContent>
 
         <TabsContent value="excel" className="mt-4">
           <ExcelDashboard />

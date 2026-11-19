@@ -30,6 +30,7 @@ interface SessionState {
   user: SessionUser | null;
   systems: SessionSystem[];
   permissions: Record<string, boolean>;
+  pageAccess: Record<string, boolean>;
   unreadNotifications: number;
   unreadConversations: number;
   loading: boolean;
@@ -41,6 +42,7 @@ export const useSession = create<SessionState>((set) => ({
   user: null,
   systems: [],
   permissions: {},
+  pageAccess: {},
   unreadNotifications: 0,
   unreadConversations: 0,
   loading: true,
@@ -53,6 +55,7 @@ export const useSession = create<SessionState>((set) => ({
         user: data.user,
         systems: data.systems || [],
         permissions: data.permissions || {},
+        pageAccess: data.pageAccess || {},
         unreadNotifications: data.unreadNotifications || 0,
         unreadConversations: data.unreadConversations || 0,
         loading: false,

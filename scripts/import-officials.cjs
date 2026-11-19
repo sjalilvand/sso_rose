@@ -20,17 +20,9 @@ const fs = require("fs");
 const path = require("path");
 const { scryptSync, randomBytes } = require("crypto");
 
-// ---------- DATABASE_URL از .env (همان الگوی reset-admin.js) ----------
-let dbUrl = process.env.DATABASE_URL || "";
-const envFile = path.join(__dirname, ".env");
-if (fs.existsSync(envFile)) {
-  for (const line of fs.readFileSync(envFile, "utf8").split(/\r?\n/)) {
-    const m = line.match(/^\s*DATABASE_URL\s*=\s*(.+)\s*$/);
-    if (m) dbUrl = m[1].trim();
-  }
-}
-if (!dbUrl) dbUrl = "file:../db/custom.db";
-process.env.DATABASE_URL = dbUrl;
+// ---------- DATABASE_URL از .env (حذف کوتیشن‌ها — همان الگوی lib-env.cjs) ----------
+const { resolveDatabaseUrl } = require("./lib-env.cjs");
+resolveDatabaseUrl();
 
 const { PrismaClient } = require("@prisma/client");
 const db = new PrismaClient();

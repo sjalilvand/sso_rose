@@ -17,18 +17,11 @@
  */
 const fs = require("fs");
 const path = require("path");
+const { resolveDatabaseUrl } = require("./lib-env.cjs");
 
 const ROOT = path.resolve(__dirname, "..");
-let dbUrl = process.env.DATABASE_URL || "";
-const envFile = path.join(ROOT, ".env");
-if (!dbUrl && fs.existsSync(envFile)) {
-  for (const line of fs.readFileSync(envFile, "utf8").split(/\r?\n/)) {
-    const m = line.match(/^\s*DATABASE_URL\s*=\s*(.+)\s*$/);
-    if (m) dbUrl = m[1].trim();
-  }
-}
-if (!dbUrl) dbUrl = "file:" + path.join(ROOT, "db", "custom.db");
-process.env.DATABASE_URL = dbUrl;
+// DATABASE_URL با حذف کوتیشن‌ها از .env — رفع خطای «URL must start with file:»
+resolveDatabaseUrl();
 
 const { PrismaClient } = require("@prisma/client");
 const db = new PrismaClient();

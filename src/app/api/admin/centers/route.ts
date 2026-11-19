@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const body = await readBody<{
       code?: string; name?: string; type?: string; region?: string; province?: string;
-      city?: string; address?: string; phone?: string; lat?: number | null; lng?: number | null;
+      county?: string; city?: string; address?: string; phone?: string; lat?: number | null; lng?: number | null;
       radiusM?: number; managerId?: string | null; isActive?: boolean;
     }>(req);
 
@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
         type: CENTER_TYPES.includes(body.type || "") ? (body.type as string) : "CLINIC",
         region: (body.region || "").trim(),
         province: (body.province || "").trim(),
+        county: (body.county || "").trim(),
         city: (body.city || "").trim(),
         address: (body.address || "").trim(),
         phone: (body.phone || "").trim(),

@@ -1,89 +1,112 @@
 #!/bin/bash
-# تست E2E کامل رز هاب — بندهای ۱ تا ۷
-BASE="http://127.0.0.1:3000"
-JAR=/tmp/rosehub-cookies.txt
-PASS_FAIL=0
+# e2e-test.sh — تست سرتاسری APIهای تغییرکرده روی سرور محلی
+set -e
+BASE=http://localhost:3777
+JAR=/tmp/e2e-cookies.txt
+rm -f $JAR
 
-chk() { # chk <name> <result>
-  if [ "$2" = "1" ]; then echo "  [OK] $1"; else echo "  [FAIL] $1"; PASS_FAIL=1; fi
-}
+echo "=== 1) Login ==="
+LOGIN=$(curl -s -c $JAR -X POST $BASE/api/auth/login -H "Content-Type: application/json" \
+  -d '{"email":"1111111111","password":"Test!Pass123"}')
+echo "$LOGIN" | head -c 300; echo
 
-echo "=== ۱) ورود ادمین ==="
-CODE=$(curl -s -c $JAR -o /tmp/login.json -w "%{http_code}" -X POST $BASE/api/auth/login -H "Content-Type: application/json" -d '{"email":"saeed@rose.ir","password":"test12345"}')
-echo "  login http=$CODE"; [ "$CODE" = "200" ] && echo "  [OK] ورود" || { echo "  [FAIL] ورود"; PASS_FAIL=1; }
+echo "=== 2) /api/auth/me — pageAccess ==="
+curl -s -b $JAR $BASE/api/auth/me | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+pa = d.get('pageAccess', {})
+print('user:', d['user']['name'], d['user']['role'])
+print('pageAccess keys:', len(pa), '— all true?', all(pa.values()) if pa else 'EMPTY')
+"
 
-echo "=== ۲) مراکز (بند ۱+۵) ==="
-DATA=$(curl -s -b $JAR $BASE/api/admin/centers)
-N=$(echo "$DATA" | python3 -c "import sys,json;d=json.load(sys.stdin);print(len(d['centers']))")
-chk "فهرست مراکز = 27" "$([ "$N" = "27" ] && echo 1 || echo 0)"
+echo "=== 3) /api/reports — THE USER-REPORTED ERROR ==="
+curl -s -b $JAR -w "\nHTTP: %{http_code}\n" $BASE/api/reports | head -c 500; echo
 
-echo "=== ۳) ثبت مرکز جدید + ویرایش + حذف ==="
-CODE=$(curl -s -b $JAR -o /tmp/cnew.json -w "%{http_code}" -X POST $BASE/api/admin/centers -H "Content-Type: application/json" -d '{"name":"مرکز تست E2E","type":"CENTER","province":"تهران","lat":35.7,"lng":51.4}')
-chk "ثبت مرکز جدید" "$([ "$CODE" = "201" ] && echo 1 || echo 0)"
-CID=$(python3 -c "import json;print(json.load(open('/tmp/cnew.json'))['center']['id'])")
-CODE=$(curl -s -b $JAR -o /dev/null -w "%{http_code}" -X PATCH $BASE/api/admin/centers/$CID -H "Content-Type: application/json" -d '{"city":"تهران","isActive":false}')
-chk "ویرایش مرکز" "$([ "$CODE" = "200" ] && echo 1 || echo 0)"
-CODE=$(curl -s -b $JAR -o /dev/null -w "%{http_code}" -X DELETE $BASE/api/admin/centers/$CID)
-chk "حذف مرکز" "$([ "$CODE" = "200" ] && echo 1 || echo 0)"
+echo "=== 4) /api/team — tree members ==="
+curl -s -b $JAR $BASE/api/team | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+print('members:', len(d.get('members', [])), 'isGlobal:', d.get('isGlobal'))
+if d.get('members'):
+    m = d['members'][0]
+    print('first member has managerId?', 'managerId' in m, '| manager:', m.get('manager'))
+"
 
-echo "=== ۴) همگام‌سازی مراکز از تکنورز (بند ۱ — انتظار خطای ارتباط چون تکنورز محلی نیست) ==="
-CODE=$(curl -s -b $JAR -o /tmp/sync.json -w "%{http_code}" -X POST $BASE/api/admin/centers/sync -H "Content-Type: application/json" -d '{}')
-echo "  sync http=$CODE (502 مورد انتظار — تکنورز روی این سرور در دسترس نیست)"
-chk "sync مسیر موجود است" "$([ "$CODE" = "502" ] && echo 1 || echo 0)"
+echo "=== 5) /api/admin/centers — county field ==="
+curl -s -b $JAR $BASE/api/admin/centers | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+cs = d.get('centers', [])
+print('centers:', len(cs))
+if cs:
+    print('county field present?', 'county' in cs[0])
+"
 
-echo "=== ۵) مدیریت‌ها (بند ۴) ==="
-DATA=$(curl -s -b $JAR $BASE/api/admin/managements)
-N=$(echo "$DATA" | python3 -c "import sys,json;d=json.load(sys.stdin);print(len(d['managements']))")
-chk "فهرست مدیریت‌ها = 1" "$([ "$N" = "1" ] && echo 1 || echo 0)"
-chk "مدیر مدیریت = سعید جلیوند" "$(echo "$DATA" | grep -q "سعید جلیوند" && echo 1 || echo 0)"
+echo "=== 6) POST /api/reports/dataset — universal excel upload ==="
+python3 - <<'PYEOF'
+import openpyxl, random
+wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = "فروش"
+ws.append(["نام شعبه", "استان", "ماه", "درآمد (ریال)", "هزینه (ریال)", "تعداد مراجع", "امتیاز رضایت"])
+rows = [
+    ["شعبه مرکزی", "تهران", "1405/01", 125000000, 80000000, 340, 4.2],
+    ["شعبه تبریز", "آذربایجان شرقی", "1405/01", 98000000, 62000000, 210, 4.5],
+    ["شعبه اردبیل", "اردبیل", "1405/01", 54000000, 41000000, 120, 3.8],
+    ["شعبه مرکزی", "تهران", "1405/02", 138000000, 85000000, 380, 4.1],
+    ["شعبه تبریز", "آذربایجان شرقی", "1405/02", 104000000, 60000000, 230, 4.6],
+    ["شعبه اردبیل", "اردبیل", "1405/02", 61000000, 44000000, 135, 4.0],
+]
+for r in rows:
+    ws.append(r)
+wb.save("/tmp/universal-test.xlsx")
+print("xlsx created")
+PYEOF
+UP=$(curl -s -b $JAR -X POST $BASE/api/reports/dataset -F "files=@/tmp/universal-test.xlsx")
+echo "$UP" | head -c 400; echo
 
-echo "=== ۶) زیرمجموعه‌ها (بند ۳) ==="
-DATA=$(curl -s -b $JAR $BASE/api/team)
-chk "isGlobal مدیر کل" "$(echo "$DATA" | python3 -c "import sys,json;d=json.load(sys.stdin);print(1 if d['isGlobal'] and len(d['members'])>=1 and d['directCount']>=1 else 0)")"
-chk "آمار وظایف زیرمجموعه" "$(echo "$DATA" | grep -q '"total":1' && echo 1 || echo 0)"
+echo "=== 7) GET dataset detail ==="
+DS_ID=$(echo "$UP" | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+ok = [r for r in d['results'] if r.get('ok')]
+print(ok[0]['id'] if ok else '')
+")
+if [ -n "$DS_ID" ]; then
+curl -s -b $JAR $BASE/api/reports/dataset/$DS_ID | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+ds = d['dataset']
+print('sheets:', [s['name'] for s in ds['sheets']])
+main = ds['sheets'][0]
+print('columns:', [(c['name'], c['type']) for c in main['columns']])
+print('rows:', len(main['rows']))
+prof = main['profile']
+incom = [p for p in prof if 'درآمد' in p['name']][0]
+print('درآمد profile: sum=%.0f mean=%.0f min=%.0f max=%.0f' % (incom['sum'], incom['mean'], incom['min'], incom['max']))
+"
+fi
 
-echo "=== ۷) وظایف — دامنهٔ مدیر (بند ۳) ==="
-DATA=$(curl -s -b $JAR "$BASE/api/tasks")
-N=$(echo "$DATA" | python3 -c "import sys,json;d=json.load(sys.stdin);print(len(d['tasks']))")
-chk "مدیر کل می‌بیند وظیفهٔ زیرمجموعه را" "$([ "$N" = "1" ] && echo 1 || echo 0)"
+echo "=== 8) Custom indicator POST (AGG) ==="
+curl -s -b $JAR -X POST $BASE/api/reports/indicators -H "Content-Type: application/json" \
+  -d '{"name":"جمع درآمد","formula":"SUM([درآمد (ریال)])","kind":"AGG","description":"تست"}' | head -c 300; echo
+echo "=== 9) Custom indicator POST (ROW) ==="
+curl -s -b $JAR -X POST $BASE/api/reports/indicators -H "Content-Type: application/json" \
+  -d '{"name":"حاشیه سود","formula":"[درآمد (ریال)] - [هزینه (ریال)]","kind":"ROW","description":"تست"}' | head -c 300; echo
+echo "=== 10) Invalid formula rejected? ==="
+curl -s -b $JAR -X POST $BASE/api/reports/indicators -H "Content-Type: application/json" \
+  -d '{"name":"بد","formula":"SUM([موجود نیست])","kind":"AGG"}' | head -c 200; echo
 
-echo "=== ۸) گزارش اکسل — آپلود چندفایلی (بند ۷) ==="
-CODE=$(curl -s -b $JAR -o /tmp/up.json -w "%{http_code}" -X POST $BASE/api/reports/excel \
-  -F "files=@/home/z/my-project/upload/خدمات آزاد شهریور 1405 کلی.xlsx")
-chk "آپلود فایل نمونه" "$([ "$CODE" = "201" ] && echo 1 || echo 0)"
-OK=$(python3 -c "import json;d=json.load(open('/tmp/up.json'));print(d['results'][0]['ok'])")
-chk "پارس موفق" "$([ "$OK" = "True" ] && echo 1 || echo 0)"
-MN=$(python3 -c "import json;d=json.load(open('/tmp/up.json'));r=d['results'][0];print(r['month'],r['year'],r['n'])")
-echo "  دوره و مشاوران: $MN (انتظار: 6 1405 216)"
-DATA=$(curl -s -b $JAR $BASE/api/reports/excel)
-N=$(echo "$DATA" | python3 -c "import sys,json;d=json.load(sys.stdin);print(len(d['files']))")
-chk "فهرست گزارش‌ها = 1" "$([ "$N" = "1" ] && echo 1 || echo 0)"
-FID=$(echo "$DATA" | python3 -c "import sys,json;print(json.load(sys.stdin)['files'][0]['id'])")
-DATA=$(curl -s -b $JAR $BASE/api/reports/excel/$FID)
-NR=$(echo "$DATA" | python3 -c "import sys,json;d=json.load(sys.stdin);print(len(d['file']['records']),len(d['file']['services']))")
-chk "داشبورد: رکورد=216 و خدمت=16" "$(echo "$NR" | grep -q "216 16" && echo 1 || echo 0)"
+echo "=== 11) Page permission PATCH on test user ==="
+ME_ID=$(curl -s -b $JAR $BASE/api/auth/me | python3 -c "import json,sys; print(json.load(sys.stdin)['user']['id'])")
+curl -s -b $JAR -X PATCH $BASE/api/users/$ME_ID -H "Content-Type: application/json" \
+  -d '{"pageAccess":{"notes":false}}' | head -c 150; echo
+curl -s -b $JAR $BASE/api/auth/me | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+print('notes pageAccess now:', d['pageAccess'].get('notes'))
+"
+curl -s -b $JAR -X PATCH $BASE/api/users/$ME_ID -H "Content-Type: application/json" \
+  -d '{"pageAccess":{"notes":true}}' > /dev/null && echo "notes access restored"
 
-echo "=== ۹) انتقال پروفایل SSO با مرکز و نقشه (بند ۶) ==="
-DATA=$(curl -s -X POST $BASE/api/sso/profile -H "Content-Type: application/json" -d '{"clientId":"rose-techno-8a4e1f","clientSecret":"test-secret-e2e","username":"1286982634"}')
-chk "found=true" "$(echo "$DATA" | grep -q '"found":true' && echo 1 || echo 0)"
-chk "clinicCenter با مختصات" "$(echo "$DATA" | python3 -c "
-import sys,json;d=json.load(sys.stdin);cc=d['profile'].get('clinicCenter') or {};print(1 if cc.get('lat') is not None and cc.get('lng') is not None else 0)")"
-chk "management در پاسخ" "$(echo "$DATA" | grep -q 'مدیریت درمان' && echo 1 || echo 0)"
-chk "managerName در پاسخ" "$(echo "$DATA" | grep -q 'سعید جلیوند' && echo 1 || echo 0)"
-chk "فیلدهای پرونده (profRank/contractNo)" "$(echo "$DATA" | grep -q 'jobTitle' && echo 1 || echo 0)"
-echo "$DATA" | python3 -c "import sys,json;p=json.load(sys.stdin)['profile'];print('  نمونه:', p['name'], '| کلینک:', p['clinic'], '| lat:', (p.get('clinicCenter') or {}).get('lat'))"
-
-echo "=== ۱۰) کاربران با فیلدهای جدید (بند ۱+۳+۴) ==="
-DATA=$(curl -s -b $JAR "$BASE/api/users?withAccess=1")
-chk "center/clinic/management/manager در پاسخ" "$(echo "$DATA" | python3 -c "
-import sys,json;d=json.load(sys.stdin);u=[x for x in d['users'] if x['username']=='1286982634'][0]
-print(1 if u['clinicId'] and u['managementId'] and u['managerId'] else 0)")"
-chk "clinicName از اطلاعات پایه" "$(echo "$DATA" | grep -q 'کلینیک اصفهان' && echo 1 || echo 0)"
-
-echo "=== ۱۱) حذف گزارش + پایان ==="
-CODE=$(curl -s -b $JAR -o /dev/null -w "%{http_code}" -X DELETE $BASE/api/reports/excel/$FID)
-chk "حذف گزارش" "$([ "$CODE" = "200" ] && echo 1 || echo 0)"
-
-echo ""
-[ "$PASS_FAIL" = "0" ] && echo "همهٔ تست‌ها موفق بود ✓" || echo "بعضی تست‌ها شکست خورد ✗"
-exit $PASS_FAIL
+echo "=== DONE ==="

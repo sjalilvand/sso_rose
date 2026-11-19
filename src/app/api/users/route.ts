@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
         clinicCenter: { select: { id: true, name: true, type: true, province: true } },
         management: { select: { id: true, name: true } },
         manager: { select: { id: true, name: true } },
+        pagePermissions: { select: { pageKey: true, allowed: true } },
       },
       orderBy: { createdAt: "asc" },
     });

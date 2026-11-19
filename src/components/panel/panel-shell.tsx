@@ -8,6 +8,8 @@ import { useTheme } from "next-themes";
 import { api } from "@/lib/client";
 import { useSession, useSessionInit } from "@/components/providers";
 import { ROLE_LABELS } from "@/lib/permissions";
+import { PANEL_PAGES, pageKeyForPath } from "@/lib/pages";
+import { ShieldOff } from "lucide-react";
 import {
   LayoutDashboard,
   Grid2X2,
@@ -82,7 +84,7 @@ function GlobalSearch() {
       }
     };
     document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
+  return () => document.removeEventListener("keydown", down);
   }, []);
 
   React.useEffect(() => {
@@ -318,8 +320,15 @@ const NAV_MAIN = [
 
 export function PanelShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, loading } = useSession();
+  const { user, loading, pageAccess } = useSession();
   useSessionInit();
+
+  const deniedKey = React.useMemo(() => {
+    if (!user || user.role === "SUPER_ADMIN") return null;
+    const key = pageKeyForPath(pathname);
+    if (!key) return null;
+    return pageAccess[key] === false ? key : null;
+  }, [user, pageAccess, pathname]);
 
   if (loading || !user) {
     return (
@@ -327,6 +336,24 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
         <div className="flex flex-col items-center gap-3">
           <Image src="/logo.svg" alt="رز هاب" width={56} height={56} className="animate-pulse" />
           <p className="text-sm text-muted-foreground">در حال بارگذاری رز هاب…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (deniedKey) {
+    const def = PANEL_PAGES.find((p) => p.key === deniedKey);
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md text-center space-y-3">
+          <div className="mx-auto size-14 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center">
+            <ShieldOff className="size-7" />
+          </div>
+          <h1 className="text-lg font-bold">دسترسی به این صفحه برای شما مسدود شده است</h1>
+          <p className="text-sm text-muted-foreground">
+            صفحهٔ «{def?.label || deniedKey}» توسط مدیر سامانه برای حساب شما غیرفعال شده است.
+            در صورت نیاز با مدیر سامانه تماس بگیرید.
+          </p>
         </div>
       </div>
     );
@@ -357,7 +384,10 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
             <SidebarGroupLabel>فضای کاری</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {NAV_MAIN.map((item) => {
+                {NAV_MAIN.filter((item) => {
+                  const def = PANEL_PAGES.find((p) => p.href === item.href);
+                  return !def || pageAccess[def.key] !== false;
+                }).map((item) => {
                   const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
                   return (
                     <SidebarMenuItem key={item.href}>
@@ -378,6 +408,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
               <SidebarGroupLabel>مدیریت</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
+                  {pageAccess["admin.registrations"] !== false && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/registrations")} tooltip="درخواست‌های ثبت‌نام">
                       <Link href="/admin/registrations">
@@ -386,6 +417,8 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  )}
+                  {pageAccess["admin.users"] !== false && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/users")} tooltip="کاربران و مجوزها">
                       <Link href="/admin/users">
@@ -394,6 +427,8 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  )}
+                  {pageAccess["admin.centers"] !== false && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/centers")} tooltip="مراکز و کلینیک‌ها">
                       <Link href="/admin/centers">
@@ -402,6 +437,8 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  )}
+                  {pageAccess["admin.managements"] !== false && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/managements")} tooltip="مدیریت‌های سازمانی">
                       <Link href="/admin/managements">
@@ -410,6 +447,8 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  )}
+                  {pageAccess["admin.systems"] !== false && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/systems")} tooltip="مدیریت سامانه‌ها">
                       <Link href="/admin/systems">
@@ -418,6 +457,8 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  )}
+                  {pageAccess["admin.audit"] !== false && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/audit")} tooltip="گزارش فعالیت‌ها">
                       <Link href="/admin/audit">
@@ -426,6 +467,8 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  )}
+                  {pageAccess["sso-docs"] !== false && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/sso-docs")} tooltip="مستندات اتصال SSO">
                       <Link href="/sso-docs">
@@ -434,6 +477,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
