@@ -80,6 +80,128 @@ function Test-PortBusy([int]$P) {
     return (Get-PortPids $P).Count -gt 0
 }
 
+# ---------- PM2 / startup diagnostics ----------
+function Show-Pm2State([string]$AppName) {
+    try {
+        $app = $null
+        foreach ($a in @(pm2 jlist 2>$null | ConvertFrom-Json)) {
+            if ([string]$a.name -eq $AppName) { $app = $a }
+        }
+        if ($app) {
+            $status   = [string]$app.pm2_env.status
+            $restarts = "?"
+            try { $restarts = [string]$app.pm2_env.restart_time } catch {}
+            $exitCode = "?"
+            try { $exitCode = [string]$app.pm2_env.exit_code } catch {}
+            Write-Host "  PM2 '$AppName': status=$status restarts=$restarts lastExitCode=$exitCode"
+            if ($status -ne "online") {
+                Write-Warn2 "PM2 reports '$status' - the process exits on startup; diagnostics will show the real error"
+            }
+            return $status
+        } else {
+            Write-Warn2 "PM2 has no app named '$AppName'"
+            return "missing"
+        }
+    } catch { return "unknown" }
+}
+
+function Show-StartupDiagnostics {
+    Write-Host ""
+    Write-Host "  ============ STARTUP DIAGNOSTICS ============" -ForegroundColor Yellow
+
+    # 1) node / npm versions
+    try { Write-Host "  node $(node -v 2>$null)  npm $(npm -v 2>$null)" } catch {}
+
+    # 2) build output really there?
+    if (Test-Path ".next\BUILD_ID") {
+        $bid = (Get-Content ".next\BUILD_ID" -ErrorAction SilentlyContinue | Select-Object -First 1)
+        Write-Ok ".next build is present (BUILD_ID=$bid)"
+    } else {
+        Write-Warn2 ".next\BUILD_ID is MISSING - the production build did not finish"
+    }
+
+    # 3) PM2 view of the app
+    Show-Pm2State $pm2Name | Out-Null
+    try { pm2 describe rose-hub 2>$null | Out-Host } catch {}
+
+    # 4) tails of every log file that may hold the crash reason
+    $logFiles = @(
+        "logs\rose-hub-error.log",
+        "logs\rose-hub-out.log",
+        (Join-Path $env:USERPROFILE ".pm2\logs\rose-hub-error.log"),
+        (Join-Path $env:USERPROFILE ".pm2\logs\rose-hub-out.log"),
+        (Join-Path $env:USERPROFILE ".pm2\pm2.log")
+    )
+    foreach ($f in $logFiles) {
+        if ($f -and (Test-Path $f)) {
+            Write-Host ""
+            Write-Host "  ---- last 30 lines of $f ----" -ForegroundColor Yellow
+            try { Get-Content $f -Tail 30 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" } } catch {}
+        }
+    }
+
+    # 5) port state
+    $owners = Get-PortPids $Port
+    Write-Host ""
+    if ($owners.Count -gt 0) {
+        Write-Host "  Port $Port is held by PID(s): $($owners -join ', ')"
+    } else {
+        Write-Host "  Port $Port is free - nothing is listening"
+    }
+
+    # 6) THE decisive test: run the app directly (no PM2) and capture the raw error
+    Write-Host ""
+    Write-Warn2 "Running the app directly WITHOUT PM2 for 18 seconds to capture the real error..."
+    $fgOut = Join-Path $env:TEMP "rosehub-fg-out.log"
+    $fgErr = Join-Path $env:TEMP "rosehub-fg-err.log"
+    Remove-Item $fgOut, $fgErr -Force -ErrorAction SilentlyContinue
+    $script:fgRanFine = $false
+    try {
+        if (Test-PortBusy $Port) {
+            Write-Warn2 "Port $Port is busy - skipping the foreground test"
+        } else {
+            $proc = Start-Process -FilePath "node" `
+                -ArgumentList "node_modules\next\dist\bin\next", "start", "-p", "$Port" `
+                -WorkingDirectory (Get-Location).Path `
+                -RedirectStandardOutput $fgOut -RedirectStandardError $fgErr `
+                -NoNewWindow -PassThru
+            Start-Sleep -Seconds 18
+            if (-not $proc.HasExited) {
+                $script:fgRanFine = $true
+                Write-Ok "The app RAN fine in the foreground (no crash) - the problem is PM2-side"
+                try {
+                    $r = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/login" -UseBasicParsing -TimeoutSec 5
+                    Write-Ok "Foreground app answered HTTP $($r.StatusCode) on /login"
+                } catch {
+                    Write-Warn2 "Foreground app is alive but did NOT answer HTTP on /login"
+                }
+                try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {}
+                Start-Sleep -Seconds 1
+                if (Test-PortBusy $Port) { Stop-PortOwners $Port }   # make sure the port is free for the PM2 retry
+            } else {
+                Write-Warn2 "The app exited by itself (exit code $($proc.ExitCode)) - the raw error is below"
+            }
+        }
+    } catch {
+        Write-Warn2 "Foreground test could not start: $_"
+    }
+    foreach ($f in @($fgOut, $fgErr)) {
+        if (Test-Path $f) {
+            $lines = Get-Content $f -ErrorAction SilentlyContinue
+            if ($lines) {
+                Write-Host ""
+                Write-Host "  ---- output of the foreground run ----" -ForegroundColor Yellow
+                $lines | Select-Object -First 60 | ForEach-Object { Write-Host "  $_" }
+            }
+        }
+    }
+
+    Write-Host ""
+    Write-Host "  Paste ALL lines above (diagnostics block) to the assistant -" -ForegroundColor Cyan
+    Write-Host "  they contain the real startup error." -ForegroundColor Cyan
+    Write-Host "  ============================================" -ForegroundColor Yellow
+}
+
 # ---------- Step 1/9: check install folder ----------
 Write-Step "Step 1/9 - Check install folder"
 if (-not (Test-Path (Join-Path $InstallDir "package.json"))) {
@@ -282,6 +404,13 @@ Write-Ok "Build completed (.next)"
 
 # ---------- Step 9/9: start PM2 and health check ----------
 Write-Step "Step 9/9 - Start app (PM2)"
+if (-not (Test-Path "logs")) { New-Item -ItemType Directory -Path "logs" -Force | Out-Null }
+if (-not (Test-Path ".next\BUILD_ID")) {
+    Write-Warn2 ".next\BUILD_ID is missing - build did not finish - rebuilding once..."
+    npm run build
+    if ($LASTEXITCODE -ne 0) { throw "build failed again - check the output above" }
+}
+try { pm2 flush 2>$null | Out-Null } catch {}   # fresh logs = readable crash reason
 if (Test-PortBusy $Port) {
     Write-Warn2 "Something already listens on port $Port - skipping PM2 start (app probably managed by another PM2 session)"
 } elseif ($inList) {
@@ -292,6 +421,8 @@ if (Test-PortBusy $Port) {
     pm2 save 2>$null | Out-Null
     Write-Ok "PM2: app started from ecosystem.config.js"
 }
+Start-Sleep -Seconds 5
+Show-Pm2State $pm2Name | Out-Null
 
 # ---------- Step 9b/9: Bale support bot (@rosepro_bot) under PM2 ----------
 Write-Step "Step 9b/9 - Bale support bot (PM2)"
@@ -350,7 +481,29 @@ if ($healthy) {
     Write-Host "  Tip: press Ctrl+F5 in the browser to bypass the cache."
     Write-Host "================================================================="
 } else {
-    Write-Warn2 "App did not respond - check: pm2 logs rose-hub"
+    Write-Warn2 "App did not respond - collecting diagnostics..."
+    Show-StartupDiagnostics
+    if ($script:fgRanFine) {
+        # the app works outside PM2 -> give PM2 one more chance (first start
+        # sometimes races with antivirus scanning the fresh .next folder)
+        Write-Host ""
+        Write-Warn2 "App works without PM2 - restarting under PM2 and re-checking..."
+        pm2 restart rose-hub --update-env 2>$null | Out-Null
+        Start-Sleep -Seconds 5
+        $healthy2 = $false
+        for ($i = 0; $i -lt 6; $i++) {
+            try {
+                $r = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/login" -UseBasicParsing -TimeoutSec 5
+                if ($r.StatusCode -eq 200) { $healthy2 = $true; break }
+            } catch { Start-Sleep -Seconds 2 }
+        }
+        if ($healthy2) {
+            Write-Ok "Rose Hub is NOW healthy under PM2 (first start raced with antivirus/file locks)"
+        } else {
+            Show-Pm2State $pm2Name | Out-Null
+            Write-Warn2 "Still not healthy under PM2 - the diagnostics block above shows where it dies"
+        }
+    }
 }
 
 # ---------- Step 9c/9: keep the C:\ root copy of this script fresh ----------

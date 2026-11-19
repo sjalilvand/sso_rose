@@ -10,8 +10,19 @@ module.exports = {
         PORT: "8082"
       },
       autorestart: true,
-      max_memory_restart: "700M",
-      time: true
+      // pacing so a fast startup crash does not hammer the CPU and PM2 keeps
+      // a readable error log instead of racing into "errored" state
+      min_uptime: "15s",
+      max_restarts: 20,
+      restart_delay: 4000,
+      // Next 16 production server can legitimately touch ~800M RSS
+      max_memory_restart: "900M",
+      kill_timeout: 8000,
+      time: true,
+      // persist logs to files so startup crashes are always diagnosable
+      merge_logs: true,
+      out_file: "logs/rose-hub-out.log",
+      error_file: "logs/rose-hub-error.log"
     },
     {
       name: "rose-bale-bot",
@@ -23,8 +34,14 @@ module.exports = {
         APP_PUBLIC_URL: "http://130.185.73.157:8082"
       },
       autorestart: true,
+      min_uptime: "15s",
+      max_restarts: 20,
+      restart_delay: 4000,
       max_memory_restart: "300M",
-      time: true
+      time: true,
+      merge_logs: true,
+      out_file: "logs/bale-bot-out.log",
+      error_file: "logs/bale-bot-error.log"
     }
   ]
 };
