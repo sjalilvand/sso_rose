@@ -107,6 +107,32 @@ function Stop-RoseHubNode {
     } catch {}
 }
 
+# ---------- build artifact checks (Next 16.4) ----------
+# runtime نسخهٔ 16.4 هنگام بارگذاری middleware/edge فایل server\preview-props.json
+# را می‌خواند؛ اگر build ناقص/مخلوط باشد اپ چند ثانیه بعد از Ready با
+# «ENOENT ... preview-props.json» در حلقهٔ کرش می‌افتد.
+function Test-BuildArtifacts {
+    $ok = $true
+    foreach ($f in @(".next\BUILD_ID", ".next\server\preview-props.json", ".next\server\middleware-manifest.json")) {
+        if (-not (Test-Path $f)) {
+            Write-Warn2 "build artifact missing: $f"
+            $ok = $false
+        }
+    }
+    return $ok
+}
+
+function Invoke-CleanBuild {
+    # build همیشه تمیز — بقایای build قبلی نباید در .next بمانند
+    if (Test-Path ".next") {
+        Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    }
+    # Out-Host تا خروجی build وارد stream خروجی تابع نشود (bool خراب نشود)
+    npm run build | Out-Host
+    return ($LASTEXITCODE -eq 0)
+}
+
 # ---------- PM2 / startup diagnostics ----------
 function Show-Pm2State([string]$AppName) {
     try {
@@ -145,6 +171,9 @@ function Show-StartupDiagnostics {
         Write-Ok ".next build is present (BUILD_ID=$bid)"
     } else {
         Write-Warn2 ".next\BUILD_ID is MISSING - the production build did not finish"
+    }
+    if (-not (Test-Path ".next\server\preview-props.json")) {
+        Write-Warn2 ".next\server\preview-props.json is MISSING - build is incomplete; Next 16.4 crashes with ENOENT on it"
     }
 
     # 3) PM2 view of the app
@@ -440,17 +469,21 @@ if (Test-Path "scripts\seed-org-structure.cjs") {
 
 # ---------- Step 8/9: production build ----------
 Write-Step "Step 8/9 - Production build (a few minutes)"
-npm run build
-if ($LASTEXITCODE -ne 0) { throw "build failed - check the output above" }
-Write-Ok "Build completed (.next)"
+if (-not (Invoke-CleanBuild)) { throw "build failed - check the output above" }
+if (-not (Test-BuildArtifacts)) {
+    Write-Warn2 "Build output incomplete - one clean rebuild..."
+    if (-not (Invoke-CleanBuild)) { throw "build failed again - check the output above" }
+    if (-not (Test-BuildArtifacts)) { throw "build output still incomplete - missing .next\BUILD_ID or .next\server\preview-props.json" }
+}
+Write-Ok "Build completed and verified (BUILD_ID + preview-props.json)"
 
 # ---------- Step 9/9: start PM2 and health check ----------
 Write-Step "Step 9/9 - Start app (PM2)"
 if (-not (Test-Path "logs")) { New-Item -ItemType Directory -Path "logs" -Force | Out-Null }
-if (-not (Test-Path ".next\BUILD_ID")) {
-    Write-Warn2 ".next\BUILD_ID is missing - build did not finish - rebuilding once..."
-    npm run build
-    if ($LASTEXITCODE -ne 0) { throw "build failed again - check the output above" }
+if (-not (Test-BuildArtifacts)) {
+    Write-Warn2 "Build artifacts missing - one clean rebuild..."
+    if (-not (Invoke-CleanBuild)) { throw "build failed again - check the output above" }
+    if (-not (Test-BuildArtifacts)) { throw "build output still incomplete after rebuild" }
 }
 try { pm2 flush 2>$null | Out-Null } catch {}   # fresh logs = readable crash reason
 if (Test-PortBusy $Port) {
@@ -493,12 +526,18 @@ if ($botInList) {
 }
 pm2 save 2>$null | Out-Null
 Start-Sleep -Seconds 3
+
+# وضعیت بات را دو بار چک می‌کنیم — دفعهٔ اول ممکن است هنوز launching باشد
 $botOnline = $false
-try {
-    foreach ($app in @(pm2 jlist 2>$null | ConvertFrom-Json)) {
-        if ([string]$app.name -eq "rose-bale-bot" -and [string]$app.pm2_env.status -eq "online") { $botOnline = $true }
-    }
-} catch {}
+for ($bi = 0; $bi -lt 2; $bi++) {
+    try {
+        foreach ($app in @(pm2 jlist 2>$null | ConvertFrom-Json)) {
+            if ([string]$app.name -eq "rose-bale-bot" -and [string]$app.pm2_env.status -eq "online") { $botOnline = $true }
+        }
+    } catch {}
+    if ($botOnline) { break }
+    Start-Sleep -Seconds 5
+}
 if ($botOnline) {
     Write-Ok "Bale bot @rosepro_bot is online (password reset + support via Bale messenger)"
 } else {
@@ -523,13 +562,12 @@ if ($healthy) {
     Write-Host "================================================================="
     Write-Host "  URL              : http://130.185.73.157:$Port"
     Write-Host "  In this version  :"
-    Write-Host "    - Mobile-friendly login + QR code (left side) to open the hub on phones"
-    Write-Host "    - PWA manifest: the hub can be added to the phone home screen"
-    Write-Host "    - Self-service registration with admin approval (login only after"
-    Write-Host "      approval in: management -> Registration requests)"
+    Write-Host "    - Fix: report upload (excel + universal dashboards) no longer 500s"
+    Write-Host "      - the client helper was mangling FormData uploads"
+    Write-Host "    - Fix: every update now does a CLEAN build + verifies"
+    Write-Host "      BUILD_ID/preview-props.json - no more ENOENT crash loop"
     Write-Host "    - Bale support bot @rosepro_bot: password reset + support inbox"
     Write-Host "      (PM2 app: rose-bale-bot; users must link their account in the bot first)"
-    Write-Host "    - Update script: safe stop + database backup/restore"
     Write-Host "  Tip: press Ctrl+F5 in the browser to bypass the cache."
     Write-Host "================================================================="
 } else {
