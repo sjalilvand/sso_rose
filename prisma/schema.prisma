@@ -125,9 +125,24 @@ model Center {
   users       User[]       @relation("userCenter")
   clinics     User[]       @relation("userClinic")
   managements Management[]
+  mgLinks     ManagementCenter[]
 
   @@index([province])
   @@index([type])
+}
+
+// رابطهٔ چند‌به‌چند مدیریت سازمانی ↔ مراکز — یک مدیریت می‌تواند به هر تعداد
+// مرکز/کلینیکِ فرم «مراکز و کلینیک‌ها» متصل باشد (فاز ۷۴)
+model ManagementCenter {
+  managementId String
+  centerId     String
+  createdAt    DateTime @default(now())
+
+  management Management @relation(fields: [managementId], references: [id], onDelete: Cascade)
+  center     Center     @relation(fields: [centerId], references: [id], onDelete: Cascade)
+
+  @@id([managementId, centerId])
+  @@index([centerId])
 }
 
 // مدیریت سازمانی — بند ۴: ثبت مدیریت، کارکنان آن و تعیین مدیر مدیریت
@@ -144,6 +159,7 @@ model Management {
   center  Center? @relation(fields: [centerId], references: [id], onDelete: SetNull)
   manager User?   @relation("managementManager", fields: [managerId], references: [id], onDelete: SetNull)
   members User[]  @relation("managementMembers")
+  links   ManagementCenter[]
 }
 
 // ---------- گزارش‌های اکسل (داشبورد چندماهه) ----------

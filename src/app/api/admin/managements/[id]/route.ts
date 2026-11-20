@@ -4,7 +4,7 @@ import { requireAuth, audit, ApiError } from "@/lib/auth";
 import { apiError, json, readBody } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
 
-/** ویرایش / حذف مدیریت سازمانی — بند ۴ */
+/** ویرایش / حذف مدیریت سازمانی — بند ۴ + اتصال چندمرکزی (فاز ۷۴) */
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -15,10 +15,22 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const current = await db.management.findUnique({ where: { id } });
     if (!current) throw new ApiError("مدیریت یافت نشد", 404);
 
-    const body = await readBody<{ name?: string; description?: string; centerId?: string | null; managerId?: string | null; isActive?: boolean }>(req);
+    const body = await readBody<{
+      name?: string; description?: string; centerIds?: string[]; centerId?: string | null;
+      managerId?: string | null; isActive?: boolean; setManagerOnCenters?: boolean;
+    }>(req);
     if (body.name !== undefined && body.name.trim() && body.name.trim() !== current.name) {
       const dup = await db.management.findUnique({ where: { name: body.name.trim() } });
       if (dup) throw new ApiError("مدیریتی با این نام قبلاً ثبت شده است", 409);
+    }
+
+    // مراکز انتخاب‌شده باید واقعاً موجود باشند
+    const centerIds = body.centerIds !== undefined
+      ? [...new Set((body.centerIds || []).filter(Boolean))]
+      : undefined;
+    if (centerIds && centerIds.length) {
+      const found = await db.center.count({ where: { id: { in: centerIds } } });
+      if (found !== centerIds.length) throw new ApiError("یکی از مراکز انتخاب‌شده یافت نشد", 400);
     }
 
     const mg = await db.management.update({
@@ -26,14 +38,29 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       data: {
         ...(body.name !== undefined ? { name: body.name.trim() || current.name } : {}),
         ...(body.description !== undefined ? { description: body.description.trim() } : {}),
-        ...(body.centerId !== undefined ? { centerId: body.centerId || null } : {}),
+        // مرکز اصلی (سازگاری با نسخهٔ قبل) = اولین مرکز انتخاب‌شده
+        ...(centerIds !== undefined
+          ? { centerId: centerIds[0] || (body.centerId !== undefined ? body.centerId : null) }
+          : body.centerId !== undefined ? { centerId: body.centerId || null } : {}),
+        ...(centerIds !== undefined
+          ? { links: { deleteMany: {}, create: centerIds.map((centerId) => ({ centerId })) } }
+          : {}),
         ...(body.managerId !== undefined ? { managerId: body.managerId || null } : {}),
         ...(body.isActive !== undefined ? { isActive: !!body.isActive } : {}),
       },
     });
 
+    // گزینهٔ اختیاری: مدیر انتخابی به‌عنوان مدیرِ مراکز انتخاب‌شده هم ثبت شود
+    if (body.setManagerOnCenters && body.managerId && centerIds && centerIds.length) {
+      await db.center.updateMany({
+        where: { id: { in: centerIds } },
+        data: { managerId: body.managerId },
+      });
+    }
+
     await audit({
-      userId: me.id, userName: me.name, action: "ویرایش مدیریت", entity: "Management", details: mg.name,
+      userId: me.id, userName: me.name, action: "ویرایش مدیریت", entity: "Management",
+      details: `${mg.name}${centerIds ? " — مراکز: " + centerIds.length : ""}`,
     });
     return json({ management: mg });
   } catch (e) {

@@ -84,6 +84,7 @@ function fmtCell(v: unknown): string {
 }
 
 const DASH_TABS = [
+  { key: "preview", label: "پیش‌نمایش و طبقه‌بندی" },
   { key: "desc", label: "توصیفی" },
   { key: "ana", label: "تحلیلی" },
   { key: "interp", label: "تفسیری" },
@@ -92,6 +93,38 @@ const DASH_TABS = [
   { key: "data", label: "داده‌ها" },
 ] as const;
 type DashTab = typeof DASH_TABS[number]["key"];
+
+// ---------- طبقه‌بندی نقش ستون‌ها (فاز ۷۴) ----------
+// عددی / دسته‌ای / توصیفی / شناسه / تاریخ — پایهٔ ساخت خودکار نمودارها و تحلیل‌ها
+type ColRole = "number" | "date" | "categorical" | "descriptive" | "id";
+
+const ROLE_META: Record<string, { label: string; color: string }> = {
+  number: { label: "عددی", color: "#10b981" },
+  categorical: { label: "دسته‌ای", color: "#3b82f6" },
+  descriptive: { label: "توصیفی", color: "#8b5cf6" },
+  id: { label: "شناسه/کد", color: "#64748b" },
+  date: { label: "تاریخ", color: "#f59e0b" },
+};
+
+const ID_COL_RE = /(کد|شناسه|کدملی|نام کاربری|ایمیل|موبایل|تلفن|شماره|آی\s?دی|email|phone|national|user\s?name|code|id$)/i;
+
+function RoleBadge({ role }: { role: string }) {
+  const m = ROLE_META[role] || { label: role, color: "#64748b" };
+  return (
+    <Badge variant="outline" className="text-[9px] px-1 shrink-0" style={{ color: m.color, borderColor: `${m.color}55` }}>
+      {m.label}
+    </Badge>
+  );
+}
+
+/** چارک‌دار — روی آرایهٔ مرتب‌شده صدا زده می‌شود */
+function qtl(sorted: number[], q: number): number {
+  if (!sorted.length) return 0;
+  const pos = (sorted.length - 1) * q;
+  const base = Math.floor(pos);
+  const rest = pos - base;
+  return sorted[base + 1] !== undefined ? sorted[base] + rest * (sorted[base + 1] - sorted[base]) : sorted[base];
+}
 
 export function UniversalDashboard() {
   // ---------- داده ----------
@@ -124,8 +157,6 @@ export function UniversalDashboard() {
   const [dim, setDim] = useState(""); // ستون دسته‌بندی برای تحلیلی
   const [measure, setMeasure] = useState(""); // ستون عددی برای تحلیلی
   const [agg, setAgg] = useState<"sum" | "avg" | "count" | "min" | "max">("sum");
-  const [histCol, setHistCol] = useState("");
-  const [catCol, setCatCol] = useState("");
   const [yCol, setYCol] = useState("");
   const [xCol, setXCol] = useState("");
   const [forecastN, setForecastN] = useState(6);
@@ -166,7 +197,7 @@ export function UniversalDashboard() {
       setActiveAgg([]);
       setActiveRows([]);
       setSelected(id);
-      setTab("desc");
+      setTab("preview");
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -192,7 +223,7 @@ export function UniversalDashboard() {
         const bad = r.results.find((x) => !x.ok);
         if (bad) toast.error(`${f.name}: ${bad.error}`);
       }
-      if (okN) toast.success(`${faNum(okN)} فایل پردازش شد — ستون‌ها به‌صورت خودکار تشخیص داده شدند`);
+      if (okN) toast.success(`${faNum(okN)} فایل پردازش شد — سرستون‌ها و طبقه‌بندی ستون‌ها در تب «پیش‌نمایش» آماده است`);
       await loadList();
       if (lastId) await loadDetail(lastId);
     } catch (err) {
@@ -254,6 +285,39 @@ export function UniversalDashboard() {
   const numCols = useMemo(() => columns.filter((c) => c.type === "number").map((c) => c.name), [columns]);
   const textCols = useMemo(() => columns.filter((c) => c.type === "text").map((c) => c.name), [columns]);
   const dateCols = useMemo(() => columns.filter((c) => c.type === "date").map((c) => c.name), [columns]);
+
+  // ---------- طبقه‌بندی نقش هر ستون: عددی / دسته‌ای / توصیفی / شناسه / تاریخ ----------
+  const colRoles = useMemo(() => {
+    const out: Record<string, ColRole> = {};
+    for (const c of columns) {
+      const p = sheet?.profile.find((x) => x.name === c.name);
+      if (c.type === "number") { out[c.name] = "number"; continue; }
+      if (c.type === "date") { out[c.name] = "date"; continue; }
+      const u = p?.unique || 0;
+      const n = p?.count || 0;
+      if (n > 0 && (u <= 15 || u / n <= 0.35)) { out[c.name] = "categorical"; continue; }
+      if (n >= 5 && u / n >= 0.8) { out[c.name] = "id"; continue; }
+      if (ID_COL_RE.test(c.name)) { out[c.name] = "id"; continue; }
+      out[c.name] = "descriptive";
+    }
+    return out;
+  }, [columns, sheet]);
+
+  const catCols = useMemo(
+    () => columns.filter((c) => colRoles[c.name] === "categorical").map((c) => c.name),
+    [columns, colRoles]
+  );
+  const roleCounts = useMemo(() => {
+    const out: Record<ColRole, number> = { number: 0, categorical: 0, descriptive: 0, id: 0, date: 0 };
+    for (const c of columns) out[colRoles[c.name]] = (out[colRoles[c.name]] || 0) + 1;
+    return out;
+  }, [columns, colRoles]);
+
+  const missingTotal = useMemo(() => (sheet?.profile || []).reduce((a, p) => a + p.missing, 0), [sheet]);
+  const cellsTotal = useMemo(
+    () => (sheet?.profile || []).reduce((a, p) => a + p.missing + p.count, 0),
+    [sheet]
+  );
 
   // شاخص‌های فعال: تعریف + AST
   const rowIndDefs = useMemo(() => {
@@ -346,22 +410,22 @@ export function UniversalDashboard() {
     return out;
   }, [aggIndDefs, filteredRows]);
 
-  // ---------- انتخاب‌های پیش‌فرض ----------
+  // ---------- انتخاب‌های پیش‌فرض (اولویت با ستون‌های دسته‌ای طبقه‌بندی‌شده) ----------
   useEffect(() => {
     if (!sheet) return;
     const nc = sheet.columns.filter((c) => c.type === "number").map((c) => c.name);
     const tc = sheet.columns.filter((c) => c.type === "text").map((c) => c.name);
     const dc = sheet.columns.filter((c) => c.type === "date").map((c) => c.name);
-    if (!dim && tc.length) setDim(tc[0]);
-    if (!measure && nc.length) setMeasure(nc[0]);
-    if (!histCol && nc.length) setHistCol(nc[0]);
-    if (!catCol && tc.length) setCatCol(tc[0]);
-    if (!yCol && nc.length) setYCol(nc[0]);
-    if (!xCol && (dc.length ? dc[0] : nc[1] || nc[0])) setXCol(dc[0] || nc[1] || nc[0] || "");
+    const cc = tc.filter((n) => colRoles[n] === "categorical");
+    const pick = (cur: string, pool: string[]) => (cur && pool.includes(cur) ? cur : pool[0] || "");
+    setDim((cur) => pick(cur, cc.length ? cc : tc));
+    setMeasure((cur) => pick(cur, nc));
+    setYCol((cur) => pick(cur, nc));
+    setXCol((cur) => pick(cur, dc.length ? dc : nc.length > 1 ? nc.slice(1) : nc));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheet?.name]);
+  }, [sheet?.name, colRoles]);
 
-  // ---------- تجمیع گروهی ----------
+  // ---------- تجمیع گروهی با آمار کامل (تعداد/جمع/میانگین/میانه/کمینه/بیشینه) ----------
   const groupData = useMemo(() => {
     if (!dim) return [];
     const keyOf = (r: Record<string, unknown>) => String(r[dim] ?? "—") || "—";
@@ -372,18 +436,24 @@ export function UniversalDashboard() {
       m.get(k)!.push(r);
     }
     const out = [...m.entries()].map(([k, rs]) => {
+      const xs = rs.map((r) => Number(r[measure])).filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+      const sum = xs.reduce((a, b) => a + b, 0);
+      const avg = xs.length ? sum / xs.length : 0;
+      const med = xs.length ? qtl(xs, 0.5) : 0;
       let v = 0;
       if (agg === "count") v = rs.length;
-      else {
-        const xs = rs.map((r) => Number(r[measure])).filter((x) => Number.isFinite(x));
-        if (agg === "sum") v = xs.reduce((a, b) => a + b, 0);
-        else if (agg === "avg") v = xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
-        else if (agg === "min") v = xs.length ? Math.min(...xs) : 0;
-        else v = xs.length ? Math.max(...xs) : 0;
-      }
-      return { name: k.length > 18 ? k.slice(0, 18) + "…" : k, value: v, n: rs.length };
+      else if (agg === "sum") v = sum;
+      else if (agg === "avg") v = avg;
+      else if (agg === "min") v = xs.length ? xs[0] : 0;
+      else v = xs.length ? xs[xs.length - 1] : 0;
+      return {
+        name: k.length > 18 ? k.slice(0, 18) + "…" : k,
+        full: k, value: v, n: rs.length, sum, avg, med,
+        min: xs.length ? xs[0] : null,
+        max: xs.length ? xs[xs.length - 1] : null,
+      };
     });
-    return out.sort((a, b) => b.value - a.value).slice(0, 15);
+    return out.sort((a, b) => b.value - a.value);
   }, [dim, measure, agg, enrichedRows]);
 
   // ---------- همبستگی‌ها ----------
@@ -478,7 +548,7 @@ export function UniversalDashboard() {
     };
   }, [yCol, xCol, enrichedRows, dateCols, forecastN]);
 
-  // ---------- بینش‌های تفسیری ----------
+  // ---------- بینش‌های تفسیری (جامع — فاز ۷۴) ----------
   const insights = useMemo(() => {
     if (!sheet) return [];
     const out: Array<{ icon: string; title: string; body: string }> = [];
@@ -486,20 +556,59 @@ export function UniversalDashboard() {
     out.push({
       icon: "rows",
       title: "اندازهٔ داده",
-      body: `${faNum(filteredRows.length)} ردیف پس از فیلتر از ${faNum(sheet.totalRows)} ردیف فایل، در ${faNum(columns.length)} ستون — ${faNum(numCols.length)} ستون عددی، ${faNum(textCols.length)} متنی و ${faNum(dateCols.length)} تاریخی.`,
+      body: `${faNum(filteredRows.length)} ردیف پس از فیلتر از ${faNum(sheet.totalRows)} ردیف فایل، در ${faNum(columns.length)} ستون — ${faNum(roleCounts.number)} ستون عددی، ${faNum(roleCounts.categorical)} دسته‌ای، ${faNum(roleCounts.descriptive)} توصیفی، ${faNum(roleCounts.id)} شناسه/کد و ${faNum(roleCounts.date)} تاریخی.`,
     });
-    // پرتندارترین ستون متنی
-    const topProf = prof.filter((p) => p.type === "text" && p.top?.length).sort((a, b) => (b.top![0].count / Math.max(1, b.count)) - (a.top![0].count / Math.max(1, a.count)))[0];
+    // پوشش داده
+    if (cellsTotal > 0) {
+      const fillPct = Math.round(((cellsTotal - missingTotal) / cellsTotal) * 100);
+      out.push({
+        icon: "fill",
+        title: "پوشش داده",
+        body: missingTotal
+          ? `${faNum(fillPct)}٪ سلول‌های جدول پر است — ${faNum(missingTotal)} سلول خالی در کل ستون‌ها؛ پر شدن آن‌ها دقت تحلیل را بالا می‌برد.`
+          : "همهٔ سلول‌های جدول پر است — داده برای تحلیل کامل و بدون نقص است.",
+      });
+    }
+    // پرتندارترین ستون دسته‌ای + تمرکز
+    const catProf = prof.filter((p) => colRoles[p.name] === "categorical" && p.top?.length && (p.unique || 0) >= 2)
+      .sort((a, b) => (a.unique || 0) - (b.unique || 0));
+    const topProf = catProf[0];
     if (topProf && topProf.top) {
       const share = Math.round((topProf.top[0].count / Math.max(1, filteredRows.length)) * 100);
       out.push({
         icon: "cat",
         title: `تمرکز داده روی یک دسته در «${topProf.name}»`,
-        body: `${share}٪ ردیف‌ها متعلق به «${topProf.top[0].value}» است؛ ${topProf.unique} مقدار یکتا در این ستون وجود دارد.`,
+        body: `${share}٪ ردیف‌ها متعلق به «${topProf.top[0].value}» است؛ ${faNum(topProf.unique)} دسته یکتا در این ستون وجود دارد.`,
       });
     }
-    // ستون‌های عددی: میانگین vs میانه (چولگی)
-    for (const p of prof.filter((x) => x.type === "number" && x.mean !== undefined && x.median !== undefined).slice(0, 3)) {
+    // مقایسهٔ دسته‌ها روی اولین ستون عددی (تحلیل متقاطع)
+    const firstNum = enrichedNumCols[0];
+    const crossCat = catProf.find((p) => (p.unique || 0) >= 2 && (p.unique || 0) <= 20);
+    if (firstNum && crossCat) {
+      const groups = new Map<string, { s: number; n: number }>();
+      for (const r of enrichedRows) {
+        const k = String(r[crossCat.name] ?? "").slice(0, 24) || "—";
+        const v = Number(r[firstNum]);
+        const g = groups.get(k) || { s: 0, n: 0 };
+        if (Number.isFinite(v)) { g.s += v; g.n++; }
+        groups.set(k, g);
+      }
+      const ranked = [...groups.entries()]
+        .filter(([, g]) => g.n > 0)
+        .map(([k, g]) => ({ k, avg: g.s / Math.max(1, g.n), n: g.n }))
+        .sort((a, b) => b.avg - a.avg);
+      if (ranked.length >= 2) {
+        const lo = ranked[ranked.length - 1];
+        const diff = lo.avg !== 0 ? Math.abs((ranked[0].avg - lo.avg) / lo.avg) * 100 : 0;
+        out.push({
+          icon: "cross",
+          title: `تفاوت دسته‌های «${crossCat.name}» در «${firstNum}»`,
+          body: `بیشترین میانگین در «${ranked[0].k}» (${fmtNum(ranked[0].avg)}) و کمترین در «${lo.k}» (${fmtNum(lo.avg)}) ثبت شده — اختلاف حدود ${faNum(Math.round(diff))}٪. این تفاوت را در تخصیص منابع و هدف‌گذاری در نظر بگیرید.`,
+        });
+      }
+    }
+    // چولگی (میانگین در برابر میانه)
+    for (const p of prof.filter((x) => x.type === "number" && x.mean !== undefined && x.median !== undefined).slice(0, 4)) {
       const skew = p.median !== 0 ? (p.mean! - p.median!) / Math.abs(p.median!) : 0;
       if (Math.abs(skew) > 0.25) {
         out.push({
@@ -508,6 +617,43 @@ export function UniversalDashboard() {
           body: `میانگین (${fmtNum(p.mean)}) ${skew > 0 ? "بیشتر" : "کمتر"} از میانه (${fmtNum(p.median)}) است؛ داده به سمت مقادیر ${skew > 0 ? "بالا" : "پایین"} چوله است — تعداد کمی رکورد بزرگ آمار را جابه‌جا می‌کنند.`,
         });
       }
+    }
+    // مقدار پرت (IQR)
+    for (const p of prof.filter((x) => x.type === "number" && x.p25 !== undefined && x.p75 !== undefined && x.max !== undefined).slice(0, 6)) {
+      const iqr = p.p75! - p.p25!;
+      if (iqr <= 0) continue;
+      const hi = p.p75! + 1.5 * iqr;
+      const lo = p.p25! - 1.5 * iqr;
+      const nHi = enrichedRows.filter((r) => { const v = Number(r[p.name]); return Number.isFinite(v) && v > hi; }).length;
+      const nLo = enrichedRows.filter((r) => { const v = Number(r[p.name]); return Number.isFinite(v) && v < lo; }).length;
+      if (nHi + nLo > 0) {
+        out.push({
+          icon: "outlier",
+          title: `مقدار پرت در «${p.name}»`,
+          body: `${faNum(nHi + nLo)} مقدار خارج از بازهٔ طبیعی (چارک اول/سوم ± ۱٫۵ برابر دامنهٔ میان‌چرفی) — بالاتر از ${fmtNum(hi)}: ${faNum(nHi)} مورد، پایین‌تر از ${fmtNum(lo)}: ${faNum(nLo)} مورد. بیشینهٔ ستون ${fmtNum(p.max)} است؛ این رکوردها را جداگانه بررسی کنید.`,
+        });
+      }
+    }
+    // دسته‌های کمیاب
+    const rareProf = catProf.find((p) => (p.unique || 0) >= 3 && p.top);
+    if (rareProf?.top) {
+      const rare = rareProf.top.filter((t) => t.count === 1);
+      if (rare.length) {
+        out.push({
+          icon: "rare",
+          title: `دسته‌های کمیاب در «${rareProf.name}»`,
+          body: `${faNum(rare.length)} دسته فقط یک‌بار در داده دیده شده${rare.length <= 3 ? ` (${rare.map((t) => t.value.slice(0, 14)).join("، ")})` : ""} — برای تحلیل دسته‌ای بهتر است این دسته‌ها ادغام یا بازبینی شوند.`,
+        });
+      }
+    }
+    // ستون تقریباً ثابت
+    const flat = prof.find((x) => x.type === "number" && x.mean !== undefined && x.std !== undefined && x.mean !== 0 && Math.abs(x.std / x.mean) < 0.05);
+    if (flat) {
+      out.push({
+        icon: "flat",
+        title: `ستون تقریباً ثابت «${flat.name}»`,
+        body: `انحراف معیار نسبت به میانگین کمتر از ۵٪ است (میانگین ${fmtNum(flat.mean)}) — این ستون قدرت تفکیک ندارد و در گروه‌بندی/مدل‌سازی کمکی نمی‌کند.`,
+      });
     }
     // همبستگی‌های قوی
     for (const c of correlations.filter((x) => Math.abs(x.r) >= 0.5).slice(0, 3)) {
@@ -550,8 +696,8 @@ export function UniversalDashboard() {
         }
       }
     }
-    return out;
-  }, [sheet, filteredRows, columns, numCols, textCols, dateCols, enrichedNumCols, correlations]);
+    return out.slice(0, 14);
+  }, [sheet, filteredRows, columns, roleCounts, correlations, enrichedNumCols, enrichedRows, dateCols, numCols, cellsTotal, missingTotal, colRoles]);
 
   // ---------- پیشنهادها ----------
   const suggestions = useMemo(() => {
@@ -636,6 +782,19 @@ export function UniversalDashboard() {
       setIndOpen(true);
     }
   }
+
+  // ---------- دادهٔ نمودارهای خودکار بر پایهٔ طبقه‌بندی ----------
+  const numProfiles = useMemo(
+    () => (sheet?.profile || []).filter((p) => p.type === "number" && p.mean !== undefined),
+    [sheet]
+  );
+  const autoCats = useMemo(() => {
+    const list = (sheet?.profile || []).filter(
+      (p) => colRoles[p.name] === "categorical" && (p.unique || 0) >= 2 && p.top?.length
+    );
+    list.sort((a, b) => (a.unique || 0) - (b.unique || 0));
+    return list.slice(0, 4).map((p) => ({ p, mode: (p.unique || 99) <= 6 ? "pie" as const : "bar" as const }));
+  }, [sheet, colRoles]);
 
   // ---------- خروجی CSV ----------
   function exportCsv() {
@@ -834,9 +993,11 @@ export function UniversalDashboard() {
             {sheet.profile.filter((p) => p.type === "number" && p.sum !== undefined).slice(0, activeAgg.length ? 4 : 5).map((p) => (
               <Card key={p.name}>
                 <CardContent className="p-4">
-                  <p className="text-[11px] text-muted-foreground truncate">{p.name}</p>
+                  <p className="text-[11px] text-muted-foreground truncate" title={p.name}>{p.name}</p>
                   <p className="text-lg font-bold mt-1">{fmtNum(p.sum)}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">میانگین: {fmtNum(p.mean)}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    میانگین {fmtNum(p.mean)} · کمینه {fmtNum(p.min)} · بیشینه {fmtNum(p.max)}
+                  </p>
                 </CardContent>
               </Card>
             ))}
@@ -855,54 +1016,243 @@ export function UniversalDashboard() {
             ))}
           </div>
 
+          {/* ---------- پیش‌نمایش و طبقه‌بندی (بعد از خواندن فایل اول این دیده می‌شود) ---------- */}
+          {tab === "preview" && (
+            <div className="space-y-4">
+              {/* آمار کلی */}
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                {[
+                  { label: "ردیف", value: faNum(filteredRows.length), color: "#0369a1" },
+                  { label: "ستون", value: faNum(columns.length), color: "#7c3aed" },
+                  { label: "عددی", value: faNum(roleCounts.number), color: "#10b981" },
+                  { label: "دسته‌ای", value: faNum(roleCounts.categorical), color: "#3b82f6" },
+                  { label: "توصیفی/شناسه", value: faNum(roleCounts.descriptive + roleCounts.id), color: "#8b5cf6" },
+                  { label: "تاریخ", value: faNum(roleCounts.date), color: "#f59e0b" },
+                ].map((k) => (
+                  <Card key={k.label}>
+                    <CardContent className="p-3 text-center">
+                      <p className="text-lg font-bold" style={{ color: k.color }}>{k.value}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{k.label}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* سرستون‌ها + مقادیر — پیش‌نمایش ۱۰ ردیف اول */}
+              <Card>
+                <CardHeader className="pb-1">
+                  <CardTitle className="text-sm flex items-center justify-between gap-2 flex-wrap">
+                    <span className="flex items-center gap-1.5"><Table2 className="size-4" /> پیش‌نمایش داده — سرستون‌ها و مقادیر</span>
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      {faNum(Math.min(10, filteredRows.length))} ردیف از {faNum(filteredRows.length)} — نوع هر ستون زیر نامش مشخص است
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto border rounded-xl">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted">
+                        <tr>
+                          {enrichedColumns.map((c) => (
+                            <th key={c.name} className="px-2 py-2 text-start whitespace-nowrap border-e last:border-e-0">
+                              <div className="flex flex-col items-start gap-1">
+                                <span className="font-bold max-w-44 truncate" title={c.name}>{c.name}</span>
+                                <RoleBadge role={colRoles[c.name] || (c.type === "number" ? "number" : c.type === "date" ? "date" : "descriptive")} />
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredRows.slice(0, 10).map((r, i) => (
+                          <tr key={i} className="border-b border-muted/50 hover:bg-muted/30">
+                            {enrichedColumns.map((c) => (
+                              <td key={c.name} className="px-2 py-1.5 whitespace-nowrap max-w-44 truncate" title={String(r[c.name] ?? "")}>
+                                {fmtCell(r[c.name])}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                        {filteredRows.length === 0 && (
+                          <tr><td className="px-2 py-6 text-center text-muted-foreground" colSpan={enrichedColumns.length}>ردیفی پس از فیلتر باقی نمانده است</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
+                    ستون‌ها به‌صورت خودکار طبقه‌بندی شده‌اند: <b>عددی</b> (جمع/میانگین/کمینه/بیشینه در تب توصیفی)،
+                    <b> دسته‌ای</b> (نمودار توزیع بر اساس دسته‌ها)، <b>توصیفی</b> (متن‌های آزاد)، <b>شناسه/کد</b> و <b>تاریخ</b>.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* طبقه‌بندی ستون‌ها + دسته‌بندی مقادیر هر فیلد */}
+              <Card>
+                <CardHeader className="pb-1">
+                  <CardTitle className="text-sm">طبقه‌بندی ستون‌ها و دسته‌بندی مقادیر</CardTitle>
+                </CardHeader>
+                <CardContent className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {enrichedColumns.map((c) => {
+                    const p = sheet.profile.find((x) => x.name === c.name);
+                    const role = colRoles[c.name] || (c.type === "number" ? "number" : c.type === "date" ? "date" : "descriptive");
+                    const fillPct = p && p.count + p.missing > 0 ? Math.round((p.count / (p.count + p.missing)) * 100) : 0;
+                    const maxTop = p?.top?.[0]?.count || 1;
+                    return (
+                      <div key={c.name} className="rounded-xl border p-3 space-y-2 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-bold truncate" title={c.name}>{c.name}</p>
+                          <RoleBadge role={role} />
+                        </div>
+                        <div>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${fillPct}%` }} />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            پر: {faNum(p?.count || 0)} ({faNum(fillPct)}٪) · خالی: {faNum(p?.missing || 0)} · یکتا: {faNum(p?.unique || 0)}
+                          </p>
+                        </div>
+                        {role === "categorical" && p?.top && (
+                          <div className="space-y-1">
+                            {p.top.slice(0, 5).map((t) => (
+                              <div key={t.value} className="flex items-center gap-1.5 text-[11px]">
+                                <span className="truncate max-w-28" title={t.value}>{t.value}</span>
+                                <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                                  <div className="h-full rounded-full bg-blue-500" style={{ width: `${(t.count / maxTop) * 100}%` }} />
+                                </div>
+                                <span className="shrink-0 text-muted-foreground">{faNum(t.count)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {role === "number" && p?.mean !== undefined && (
+                          <div className="grid grid-cols-4 gap-1 text-center">
+                            {["جمع", "میانگین", "کمینه", "بیشینه"].map((lbl, idx) => (
+                              <div key={lbl} className="rounded-lg bg-muted/60 p-1">
+                                <p className="text-[8px] text-muted-foreground">{lbl}</p>
+                                <p className="text-[11px] font-bold">
+                                  {fmtNum(idx === 0 ? p.sum : idx === 1 ? p.mean : idx === 2 ? p.min : p.max)}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {role === "date" && (p?.dateMin || p?.dateMax) && (
+                          <p className="text-[11px] text-muted-foreground" dir="ltr">{p?.dateMin} → {p?.dateMax}</p>
+                        )}
+                        {(role === "descriptive" || role === "id") && p?.top && p.top.length > 0 && (
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            نمونه: {p.top.slice(0, 3).map((t) => t.value.slice(0, 16)).join(" · ")}
+                          </p>
+                        )}
+                        {role === "number" && p?.median !== undefined && (
+                          <p className="text-[10px] text-muted-foreground">
+                            میانه {fmtNum(p.median)} · انحراف {fmtNum(p.std)} · چارک‌ها {fmtNum(p.p25)} تا {fmtNum(p.p75)}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {/* ---------- توصیفی ---------- */}
           {tab === "desc" && (
             <div className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-1">
-                    <CardTitle className="text-sm flex items-center justify-between">
-                      توزیع دسته‌بندی
-                      {colSelect(catCol, setCatCol, textCols, "")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {catCol && (
-                      <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={(sheet.profile.find((p) => p.name === catCol)?.top || []).slice(0, 10).map((t) => ({ name: t.value.length > 14 ? t.value.slice(0, 14) + "…" : t.value, تعداد: t.count }))}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
-                          <YAxis tick={{ fontSize: 10 }} />
-                          <Tooltip />
-                          <Bar dataKey="تعداد" fill="#3b82f6" radius={[6, 6, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                    {!catCol && <p className="text-xs text-muted-foreground py-10 text-center">ستون متنی وجود ندارد</p>}
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-1">
-                    <CardTitle className="text-sm flex items-center justify-between">
-                      هیستوگرام
-                      {colSelect(histCol, setHistCol, enrichedNumCols, "")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {histCol && sheet.profile.find((p) => p.name === histCol)?.histogram && (
-                      <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={sheet.profile.find((p) => p.name === histCol)!.histogram!}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis dataKey="label" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" height={60} />
-                          <YAxis tick={{ fontSize: 10 }} />
-                          <Tooltip />
-                          <Bar dataKey="count" name="تعداد" fill="#10b981" radius={[6, 6, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+              {/* داشبورد خودکار ستون‌های عددی — جمع، میانگین، کمینه، بیشینه + هیستوگرام */}
+              {numProfiles.length > 0 ? (
+                <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {numProfiles.slice(0, 9).map((p) => (
+                    <Card key={p.name}>
+                      <CardHeader className="pb-1">
+                        <CardTitle className="text-sm flex items-center justify-between gap-2">
+                          <span className="truncate" title={p.name}>{p.name}</span>
+                          <RoleBadge role="number" />
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="grid grid-cols-4 gap-1.5 text-center">
+                          {[
+                            { lbl: "جمع", v: p.sum },
+                            { lbl: "میانگین", v: p.mean },
+                            { lbl: "کمینه", v: p.min },
+                            { lbl: "بیشینه", v: p.max },
+                          ].map((k) => (
+                            <div key={k.lbl} className="rounded-lg bg-muted/60 p-1.5">
+                              <p className="text-[9px] text-muted-foreground">{k.lbl}</p>
+                              <p className="text-xs font-bold">{fmtNum(k.v)}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {p.histogram && (
+                          <ResponsiveContainer width="100%" height={110}>
+                            <BarChart data={p.histogram} margin={{ top: 4, right: 2, left: 2, bottom: 0 }}>
+                              <XAxis dataKey="label" tick={{ fontSize: 7 }} interval={1} angle={-35} textAnchor="end" height={28} />
+                              <YAxis tick={{ fontSize: 8 }} width={28} />
+                              <Tooltip formatter={(v: number) => fmtNum(v)} />
+                              <Bar dataKey="count" name="تعداد" fill="#10b981" radius={[3, 3, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        )}
+                        <p className="text-[10px] text-muted-foreground">
+                          میانه {fmtNum(p.median)} · انحراف معیار {fmtNum(p.std)} · چارک‌ها {fmtNum(p.p25)} تا {fmtNum(p.p75)}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card><CardContent className="p-6 text-center text-xs text-muted-foreground">ستون عددی در این داده پیدا نشد</CardContent></Card>
+              )}
+
+              {/* نمودارهای دسته‌بندی — خودکار بر اساس طبقه‌بندی ستون‌ها */}
+              {autoCats.length > 0 ? (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {autoCats.map(({ p, mode }) => (
+                    <Card key={p.name}>
+                      <CardHeader className="pb-1">
+                        <CardTitle className="text-sm flex items-center justify-between gap-2">
+                          <span className="truncate" title={p.name}>{p.name}</span>
+                          <RoleBadge role="categorical" />
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={mode === "pie" ? 250 : 240}>
+                          {mode === "pie" ? (
+                            <PieChart>
+                              <Pie
+                                data={(p.top || []).slice(0, 8).map((t) => ({ name: t.value.length > 12 ? t.value.slice(0, 12) + "…" : t.value, count: t.count }))}
+                                dataKey="count" nameKey="name" outerRadius={80} innerRadius={35}
+                              >
+                                {(p.top || []).slice(0, 8).map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                              </Pie>
+                              <Tooltip formatter={(v: number) => faNum(v)} />
+                              <Legend wrapperStyle={{ fontSize: 10 }} />
+                            </PieChart>
+                          ) : (
+                            <BarChart
+                              data={(p.top || []).slice(0, 10).map((t) => ({ name: t.value.length > 14 ? t.value.slice(0, 14) + "…" : t.value, تعداد: t.count }))}
+                              margin={{ top: 6, right: 8, left: 0, bottom: 30 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                              <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" height={55} />
+                              <YAxis tick={{ fontSize: 10 }} />
+                              <Tooltip formatter={(v: number) => faNum(v)} />
+                              <Bar dataKey="تعداد" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                            </BarChart>
+                          )}
+                        </ResponsiveContainer>
+                        <p className="text-[10px] text-muted-foreground">
+                          {faNum(p.unique)} دسته یکتا{p.top && p.top.length ? ` — پرتکرارترین: «${p.top[0].value}» با ${faNum(p.top[0].count)} ردیف` : ""}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card><CardContent className="p-6 text-center text-xs text-muted-foreground">ستون دسته‌ای (کمتر از ۱۵ مقدار یکتا) در این داده پیدا نشد</CardContent></Card>
+              )}
 
               <Card>
                 <CardHeader className="pb-1"><CardTitle className="text-sm">خلاصهٔ آماری ستون‌ها</CardTitle></CardHeader>
@@ -964,18 +1314,63 @@ export function UniversalDashboard() {
                     </div>
                   </div>
                   <ResponsiveContainer width="100%" height={320}>
-                    <BarChart data={groupData} margin={{ top: 6, right: 8, left: 0, bottom: 40 }}>
+                    <BarChart data={groupData.slice(0, 15)} margin={{ top: 6, right: 8, left: 0, bottom: 40 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-30} textAnchor="end" height={70} />
                       <YAxis tick={{ fontSize: 10 }} />
                       <Tooltip formatter={(v: number) => fmtNum(v)} />
                       <Bar dataKey="value" name={`${agg === "sum" ? "جمع" : agg === "avg" ? "میانگین" : agg === "count" ? "تعداد" : agg === "min" ? "کمینه" : "بیشینه"} ${measure}`} radius={[6, 6, 0, 0]}>
-                        {groupData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                        {groupData.slice(0, 15).map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                  {groupData.length > 15 && (
+                    <p className="text-[10px] text-muted-foreground">۱۵ دستهٔ نخست نمایش داده شده — جدول کامل پایین است</p>
+                  )}
                 </CardContent>
               </Card>
+
+              {/* جدول کامل آمار هر دسته — تعداد/جمع/میانگین/میانه/کمینه/بیشینه */}
+              {groupData.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-1">
+                    <CardTitle className="text-sm">
+                      آمار کامل «{measure || "ردیف‌ها"}» بر اساس دستهٔ «{dim}»
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-muted-foreground border-b">
+                          <th className="text-start py-2 ps-2">دسته ({dim})</th>
+                          <th>تعداد ردیف</th>
+                          <th>جمع</th>
+                          <th>میانگین</th>
+                          <th>میانه</th>
+                          <th>کمینه</th>
+                          <th>بیشینه</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groupData.slice(0, 40).map((g) => (
+                          <tr key={g.full} className="border-b border-muted/60 hover:bg-muted/40">
+                            <td className="py-1.5 ps-2 font-medium truncate max-w-40" title={g.full}>{g.full}</td>
+                            <td className="text-center">{faNum(g.n)}</td>
+                            <td className="text-center">{fmtNum(g.sum)}</td>
+                            <td className="text-center">{fmtNum(g.avg)}</td>
+                            <td className="text-center">{fmtNum(g.med)}</td>
+                            <td className="text-center">{g.min !== null ? fmtNum(g.min) : "—"}</td>
+                            <td className="text-center">{g.max !== null ? fmtNum(g.max) : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {groupData.length > 40 && (
+                      <p className="text-[10px] text-muted-foreground mt-1.5">{faNum(groupData.length - 40)} دستهٔ دیگر نمایش داده نشده است</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               <div className="grid md:grid-cols-2 gap-4">
                 <Card>

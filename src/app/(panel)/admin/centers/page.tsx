@@ -876,20 +876,20 @@ export default function AdminCentersPage() {
       )}
       {/* فرم مرکز */}
       <Dialog open={formOpen} onOpenChange={(v) => { if (!v) { setFormOpen(false); setPickMode(false); pickModeRef.current = false; } }}>
-        <DialogContent className="sm:max-w-xl max-h-[88vh] overflow-y-auto" dir="rtl">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-2xl max-h-[92dvh] overflow-y-auto overflow-x-hidden" dir="rtl">
+          <DialogHeader className="min-w-0">
             <DialogTitle>{form.id ? "ویرایش مرکز" : "ثبت مرکز جدید"}</DialogTitle>
             <DialogDescription>
               مشخصات پایهٔ مرکز/کلینیک — مختصات نقشه در انتقال به سامانه‌ها و نمایش نقشهٔ مراکز استفاده می‌شود.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-3 min-w-0">
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>نام مرکز *</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثلاً کلینیک رز تهران" />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>نوع</Label>
                 <Select dir="rtl" value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -902,17 +902,17 @@ export default function AdminCentersPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>کد مرکز</Label>
                 <Input dir="ltr" className="text-left" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="خالی = تولید خودکار" />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>منطقه / حوزه</Label>
                 <Input value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>استان</Label>
                 <SearchableSelect
                   value={form.province}
@@ -922,7 +922,7 @@ export default function AdminCentersPage() {
                   placeholder="انتخاب استان"
                 />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>شهرستان</Label>
                 <Input
                   value={form.county}
@@ -934,7 +934,7 @@ export default function AdminCentersPage() {
                   {countySuggestions.map((c) => <option key={c} value={c} />)}
                 </datalist>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>شهر</Label>
                 <SearchableSelect
                   value={form.city}
@@ -945,7 +945,7 @@ export default function AdminCentersPage() {
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label className="flex items-center gap-1.5"><UserRound className="size-3.5" /> مدیر مرکز</Label>
               <SearchableSelect
                 value={form.managerId}
@@ -961,23 +961,23 @@ export default function AdminCentersPage() {
               <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>تلفن</Label>
                 <Input dir="ltr" className="text-left" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>شعاع مجاز تردد (متر)</Label>
                 <Input dir="ltr" className="text-left" inputMode="numeric" value={form.radiusM}
                   onChange={(e) => setForm({ ...form, radiusM: e.target.value })} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>عرض جغرافیایی (lat)</Label>
                 <Input dir="ltr" className="text-left" inputMode="decimal" value={form.lat}
                   onChange={(e) => setForm({ ...form, lat: e.target.value })} placeholder="35.6892" />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>طول جغرافیایی (lng)</Label>
                 <Input dir="ltr" className="text-left" inputMode="decimal" value={form.lng}
                   onChange={(e) => setForm({ ...form, lng: e.target.value })} placeholder="51.3890" />
