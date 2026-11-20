@@ -5,10 +5,17 @@ export async function api<T = unknown>(
   url: string,
   options?: { method?: string; body?: unknown }
 ): Promise<T> {
+  // اگر FormData است، مستقیم ارسال می‌شود — مرورگر خودش هدر multipart با boundary می‌سازد؛
+  // JSON.stringify روی FormData فایل را نابود می‌کند و سرور خطای Content-Type می‌دهد.
+  const isForm = typeof FormData !== "undefined" && options?.body instanceof FormData;
   const res = await fetch(url, {
     method: options?.method || "GET",
-    headers: options?.body ? { "Content-Type": "application/json" } : undefined,
-    body: options?.body ? JSON.stringify(options.body) : undefined,
+    headers: options?.body && !isForm ? { "Content-Type": "application/json" } : undefined,
+    body: isForm
+      ? (options?.body as FormData)
+      : options?.body
+        ? JSON.stringify(options.body)
+        : undefined,
     cache: "no-store",
   });
   const data = await res.json().catch(() => ({}));

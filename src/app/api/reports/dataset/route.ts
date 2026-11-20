@@ -38,7 +38,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const me = await requireAuth(req);
-    const form = await req.formData();
+    // فقط multipart/form-data قابل قبول است — درخواست بد، خطای شفاف ۴۰۰ بدهد نه ۵۰۰
+    let form: FormData;
+    try {
+      form = await req.formData();
+    } catch {
+      throw new ApiError("درخواست آپلود نامعتبر است — فایل را دوباره انتخاب کنید", 400);
+    }
     const files = [...form.getAll("files"), ...form.getAll("file")] as File[];
     if (!files.length) throw new ApiError("حداقل یک فایل اکسل انتخاب کنید", 400);
 
