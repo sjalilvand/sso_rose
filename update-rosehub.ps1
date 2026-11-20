@@ -19,9 +19,12 @@
 #          Windows refuses to replace the locked query engine DLL
 #          (EPERM rename error). The stop routine works even when the app
 #          is not visible in the current user's PM2 list: it stops any PM2
-#          app living in the install folder, then kills whatever still
-#          listens on the app port, then kills the PM2 daemon / node.exe
-#          if something keeps respawning it.
+#          app living in the install folder, then kills the PM2 daemon,
+#          then kills any RoseHub node.exe orphan (a dead PM2 daemon leaves
+#          its children alive on Windows - the Bale bot in particular keeps
+#          the query engine DLL locked), then kills whatever still
+#          listens on the app port. Step 6 additionally retries
+#          "prisma generate" three times with orphan cleanup in between.
 # =============================================================================
 
 #requires -Version 5.1
@@ -78,6 +81,30 @@ function Stop-PortOwners([int]$P) {
 
 function Test-PortBusy([int]$P) {
     return (Get-PortPids $P).Count -gt 0
+}
+
+function Stop-RoseHubNode {
+    # Kill any node.exe whose command line belongs to Rose Hub (the app, the
+    # bale bot, seed scripts, orphaned PM2 children). Children of a dead PM2
+    # daemon survive as orphans on Windows and keep the Prisma query engine
+    # DLL locked -> EPERM rename in "prisma generate". The PM2 daemon itself
+    # is NOT matched (its command line lives in the nodejs folder) - pm2 kill
+    # handles it gracefully.
+    try {
+        $procs = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue)
+        foreach ($p in $procs) {
+            $cmd = ""
+            try { $cmd = [string]$p.CommandLine } catch {}
+            if ($cmd -and ($cmd -match "RoseHub" -or $cmd -match "bale-bot")) {
+                try {
+                    Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+                    $short = $cmd
+                    if ($short.Length -gt 90) { $short = $short.Substring(0, 90) + "..." }
+                    Write-Warn2 "Killed lingering node.exe (PID $($p.ProcessId)): $short"
+                } catch {}
+            }
+        }
+    } catch {}
 }
 
 # ---------- PM2 / startup diagnostics ----------
@@ -232,21 +259,23 @@ if (-not $inList) {
     Write-Warn2 "No PM2 app found for this folder in the current user's PM2 list"
 }
 
+# 2b) kill the PM2 daemon and ALL leftover RoseHub node processes.
+#     WHY: children of a dead PM2 daemon survive as ORPHANS on Windows and
+#     keep the Prisma query engine DLL locked -> EPERM in prisma generate.
+#     The bale bot (rose-bale-bot) loads the query engine too and must be
+#     stopped before prisma touches anything.
 Start-Sleep -Seconds 2
+pm2 kill 2>$null | Out-Null
+Write-Ok "PM2 daemon stopped (a fresh daemon will be spawned in Step 9)"
+Stop-RoseHubNode
+Start-Sleep -Seconds 1
 
-# 2b) whatever still listens on the app port IS the app - kill it
+# 2c) whatever still listens on the app port IS the app - kill it
 if (Test-PortBusy $Port) {
     Stop-PortOwners $Port
     Start-Sleep -Seconds 3
-    # 2c) if it came back, a supervisor respawns it - kill the supervisor too
     if (Test-PortBusy $Port) {
-        Write-Warn2 "App came back after kill - stopping PM2 daemon and node processes"
-        pm2 kill 2>$null | Out-Null
-        Stop-PortOwners $Port
-        Start-Sleep -Seconds 2
-    }
-    if (Test-PortBusy $Port) {
-        Write-Warn2 "Still respawning - killing all node.exe processes (Rose Hub is the only Node app on this server)"
+        Write-Warn2 "Port still busy after targeted kills - killing all node.exe (Rose Hub is the only Node app on this server)"
         taskkill /F /IM node.exe 2>$null | Out-Null
         Start-Sleep -Seconds 2
         Stop-PortOwners $Port
@@ -256,7 +285,7 @@ if (Test-PortBusy $Port) {
 if (Test-PortBusy $Port) {
     Write-Warn2 "Port $Port is STILL busy - prisma/build steps may fail on locked files"
 } else {
-    Write-Ok "App stopped, port $Port is free"
+    Write-Ok "App stopped, port $Port is free, no node.exe holds RoseHub files"
 }
 
 # ---------- Step 3/9: backup database ----------
@@ -354,8 +383,21 @@ Write-Ok "Dependencies installed (xlsx present)"
 
 # ---------- Step 6/9: Prisma (client + schema sync) ----------
 Write-Step "Step 6/9 - Prisma (generate + db push)"
-npx prisma generate
-if ($LASTEXITCODE -ne 0) { throw "prisma generate failed - is the app really stopped? Re-run this script." }
+# clean leftover tmp files from an interrupted generate (harmless but noisy)
+Get-ChildItem "node_modules\.prisma\client" -Filter "*.tmp*" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+$genOk = $false
+for ($genTry = 1; $genTry -le 3 -and -not $genOk; $genTry++) {
+    npx prisma generate
+    if ($LASTEXITCODE -eq 0) {
+        $genOk = $true
+    } else {
+        # EPERM/EBUSY here = some node.exe still holds query_engine-windows.dll.node
+        Write-Warn2 "prisma generate failed (attempt $genTry/3) - stopping RoseHub node.exe processes that may hold the query engine DLL, then retrying..."
+        Stop-RoseHubNode
+        Start-Sleep -Seconds 3
+    }
+}
+if (-not $genOk) { throw "prisma generate failed 3 times - a server reboot clears any stuck file lock, then re-run this script" }
 npx prisma db push --accept-data-loss --skip-generate
 if ($LASTEXITCODE -ne 0) { Write-Warn2 "prisma db push failed - harmless if the schema did not change" }
 Write-Ok "Prisma ready (username + consultant fields present)"
@@ -413,13 +455,23 @@ if (-not (Test-Path ".next\BUILD_ID")) {
 try { pm2 flush 2>$null | Out-Null } catch {}   # fresh logs = readable crash reason
 if (Test-PortBusy $Port) {
     Write-Warn2 "Something already listens on port $Port - skipping PM2 start (app probably managed by another PM2 session)"
-} elseif ($inList) {
-    pm2 restart $pm2Name --update-env
-    Write-Ok "PM2: $pm2Name restarted"
 } else {
-    pm2 start ecosystem.config.js --only rose-hub
-    pm2 save 2>$null | Out-Null
-    Write-Ok "PM2: app started from ecosystem.config.js"
+    # pm2 kill in Step 2 means the app may not be registered in the (new)
+    # daemon even if it was in the list earlier - check the FRESH list
+    $aliveNow = $false
+    try {
+        foreach ($a in @(pm2 jlist 2>$null | ConvertFrom-Json)) {
+            if ([string]$a.name -eq $pm2Name) { $aliveNow = $true }
+        }
+    } catch {}
+    if ($aliveNow) {
+        pm2 restart $pm2Name --update-env
+        Write-Ok "PM2: $pm2Name restarted"
+    } else {
+        pm2 start ecosystem.config.js --only rose-hub
+        pm2 save 2>$null | Out-Null
+        Write-Ok "PM2: app started from ecosystem.config.js"
+    }
 }
 Start-Sleep -Seconds 5
 Show-Pm2State $pm2Name | Out-Null
